@@ -3,7 +3,9 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
+  Query,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -12,6 +14,8 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { SendPaymentLinkDto } from './dto/send-payment-link.dto';
+import { QueryOrdersDto } from './dto/query-orders.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { AdminAuthGuard } from '../common/admin-auth.guard';
 
 @Controller('orders')
@@ -28,14 +32,21 @@ export class OrdersController {
     return this.ordersService.createOrder(dto, files);
   }
 
-  // 管理者向け: 注文一覧の取得 (x-admin-key ヘッダーが必要)
+  // 管理者向け: 注文一覧の取得・検索 (x-admin-id / x-admin-password ヘッダーが必要)
   @UseGuards(AdminAuthGuard)
   @Get()
-  async findAll() {
-    return this.ordersService.findAll();
+  async findAll(@Query() query: QueryOrdersDto) {
+    return this.ordersService.findAll(query);
   }
 
-  // 管理者向け: 支払いリンクを確定してお客様にメール送信 (x-admin-key ヘッダーが必要)
+  // 管理者向け: ステータスの手動変更 (内容確認中への変更・キャンセルなど)
+  @UseGuards(AdminAuthGuard)
+  @Patch(':id/status')
+  async updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
+    return this.ordersService.updateStatus(id, dto.status);
+  }
+
+  // 管理者向け: 支払いリンクを確定してお客様にメール送信 (x-admin-id / x-admin-password ヘッダーが必要)
   @UseGuards(AdminAuthGuard)
   @Post(':id/send-payment-link')
   async sendPaymentLink(@Param('id') id: string, @Body() dto: SendPaymentLinkDto) {

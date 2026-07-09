@@ -5,6 +5,8 @@ import { StorageService } from '../storage/storage.service';
 import { MailService } from '../mail/mail.service';
 import { ProductsService } from '../products/products.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { QueryOrdersDto } from './dto/query-orders.dto';
+import { OrderStatus } from './order-status';
 
 @Injectable()
 export class OrdersService {
@@ -61,8 +63,22 @@ export class OrdersService {
     return { orderId: order.id };
   }
 
-  async findAll() {
-    return this.ordersRepository.findAll();
+  async findAll(query: QueryOrdersDto = {}) {
+    return this.ordersRepository.findAll({
+      status: query.status,
+      keyword: query.keyword,
+      // 日付入力(YYYY-MM-DD)を、その日の始まり/終わりのISO日時に変換してから絞り込む
+      dateFrom: query.dateFrom ? `${query.dateFrom}T00:00:00.000Z` : undefined,
+      dateTo: query.dateTo ? `${query.dateTo}T23:59:59.999Z` : undefined,
+    });
+  }
+
+  async updateStatus(orderId: string, status: OrderStatus) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('注文が見つかりません');
+    }
+    return this.ordersRepository.update(orderId, { status });
   }
 
   async sendPaymentLink(orderId: string, paymentLink: string) {

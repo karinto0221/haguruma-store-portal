@@ -28,7 +28,7 @@ npm run start:dev
 
 `.env` で最低限設定するもの:
 
-- `ADMIN_API_KEY` … 管理画面用の合言葉。ランダムな文字列にしてください
+- `ADMIN_USER_ID` / `ADMIN_PASSWORD` … 管理画面ログイン用のユーザーID・パスワード。パスワードはランダムな文字列にしてください
 - `ADMIN_NOTIFY_EMAIL` … 新規注文が入ったときに通知を受け取るメールアドレス
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` … メール送信用。未設定でも動作しますが、メールは飛ばずログに出るだけになります
 
@@ -47,7 +47,7 @@ npm run dev
 
 1. お客様が商品を選び、フォームとデザインファイルを送信
 2. `ADMIN_NOTIFY_EMAIL` 宛に注文内容の通知メールが届く
-3. 管理者が `/admin` にアクセスし、`ADMIN_API_KEY` を入力して注文一覧を確認
+3. 管理者が `/admin` にアクセスし、`ADMIN_USER_ID` / `ADMIN_PASSWORD` でログインして注文一覧を確認・検索
 4. 支払いリンク(Stripeの支払いリンク、PayPal.me、銀行振込の案内ページなど何でも可)を該当注文の欄に貼って送信
 5. お客様にお支払い案内メールが自動送信される
 

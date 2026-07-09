@@ -44,6 +44,22 @@ export async function createOrder(input: CreateOrderInput): Promise<{ orderId: s
 
 // --- 管理者向け ---
 
+export type OrderStatus = 'new' | 'reviewing' | 'payment_link_sent' | 'cancelled';
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  new: '新規注文',
+  reviewing: '内容確認中',
+  payment_link_sent: 'メール送信済み',
+  cancelled: 'キャンセル',
+};
+
+export const ORDER_STATUS_OPTIONS: OrderStatus[] = [
+  'new',
+  'reviewing',
+  'payment_link_sent',
+  'cancelled',
+];
+
 export interface OrderRecord {
   id: string;
   productName: string;
@@ -52,27 +68,73 @@ export interface OrderRecord {
   quantity: number;
   notes?: string;
   fileNames: string[];
-  status: 'new' | 'payment_link_sent';
+  status: OrderStatus;
   paymentLink?: string;
   createdAt: string;
 }
 
-export async function fetchOrdersAdmin(adminKey: string): Promise<OrderRecord[]> {
-  const res = await fetch(`${API_BASE_URL}/orders`, {
-    headers: { 'x-admin-key': adminKey },
+export interface AdminCredentials {
+  id: string;
+  password: string;
+}
+
+export interface OrdersSearchFilter {
+  status?: OrderStatus | '';
+  keyword?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+function adminHeaders(credentials: AdminCredentials): Record<string, string> {
+  return {
+    'x-admin-id': credentials.id,
+    'x-admin-password': credentials.password,
+  };
+}
+
+export async function fetchOrdersAdmin(
+  credentials: AdminCredentials,
+  filter: OrdersSearchFilter = {},
+): Promise<OrderRecord[]> {
+  const params = new URLSearchParams();
+  if (filter.status) params.set('status', filter.status);
+  if (filter.keyword) params.set('keyword', filter.keyword);
+  if (filter.dateFrom) params.set('dateFrom', filter.dateFrom);
+  if (filter.dateTo) params.set('dateTo', filter.dateTo);
+
+  const query = params.toString();
+  const res = await fetch(`${API_BASE_URL}/orders${query ? `?${query}` : ''}`, {
+    headers: adminHeaders(credentials),
   });
-  if (!res.ok) throw new Error('注文一覧の取得に失敗しました(管理者キーを確認してください)');
+  if (!res.ok) throw new Error('注文一覧の取得に失敗しました(ユーザーID・パスワードを確認してください)');
+  return res.json();
+}
+
+export async function updateOrderStatusAdmin(
+  credentials: AdminCredentials,
+  orderId: string,
+  status: OrderStatus,
+): Promise<OrderRecord> {
+  const res = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || 'ステータスの更新に失敗しました');
+  }
   return res.json();
 }
 
 export async function sendPaymentLinkAdmin(
-  adminKey: string,
+  credentials: AdminCredentials,
   orderId: string,
   paymentLink: string,
 ): Promise<OrderRecord> {
   const res = await fetch(`${API_BASE_URL}/orders/${orderId}/send-payment-link`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+    headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
     body: JSON.stringify({ paymentLink }),
   });
   if (!res.ok) {

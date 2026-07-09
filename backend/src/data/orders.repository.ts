@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { OrderStatus } from '../orders/order-status';
 
-export type OrderStatus = 'new' | 'payment_link_sent';
+export { OrderStatus };
 
 export interface OrderRecord {
   id: string;
@@ -17,6 +18,15 @@ export interface OrderRecord {
   status: OrderStatus;
   paymentLink?: string;
   createdAt: string;
+}
+
+export interface OrdersFilter {
+  status?: OrderStatus;
+  // 顧客名・メール・商品名・注文IDのいずれかに部分一致すれば該当とみなす
+  keyword?: string;
+  // createdAt (ISO文字列) の範囲。両端を含む
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 /**
@@ -50,8 +60,29 @@ export class OrdersRepository {
     return order;
   }
 
-  async findAll(): Promise<OrderRecord[]> {
-    const orders = await this.readAll();
+  async findAll(filter: OrdersFilter = {}): Promise<OrderRecord[]> {
+    let orders = await this.readAll();
+
+    if (filter.status) {
+      orders = orders.filter((o) => o.status === filter.status);
+    }
+    if (filter.keyword) {
+      const keyword = filter.keyword.toLowerCase();
+      orders = orders.filter(
+        (o) =>
+          o.customerName.toLowerCase().includes(keyword) ||
+          o.customerEmail.toLowerCase().includes(keyword) ||
+          o.productName.toLowerCase().includes(keyword) ||
+          o.id.toLowerCase().includes(keyword),
+      );
+    }
+    if (filter.dateFrom) {
+      orders = orders.filter((o) => o.createdAt >= filter.dateFrom!);
+    }
+    if (filter.dateTo) {
+      orders = orders.filter((o) => o.createdAt <= filter.dateTo!);
+    }
+
     return orders.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }
 
