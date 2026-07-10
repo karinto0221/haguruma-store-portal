@@ -18,7 +18,7 @@ export class OrdersService {
   ) {}
 
   async createOrder(dto: CreateOrderDto, files: Express.Multer.File[]) {
-    const product = this.productsService.findById(dto.productId);
+    const product = await this.productsService.findById(dto.productId);
     if (!product) {
       throw new NotFoundException('指定された商品が見つかりません');
     }

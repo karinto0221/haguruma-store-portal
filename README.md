@@ -17,7 +17,23 @@ paper-order-site/
 
 ## ローカルで動かす
 
-### 1. backend
+### 1. データベース(PostgreSQL)
+
+商品・注文データはPostgreSQLに保存する。ローカルはDockerで立てるのが手軽:
+
+```
+docker compose up -d db
+```
+
+`docker-compose.yml` の `db` サービスがホスト側の`5433`番ポートでPostgresを公開する(`5432`番は他のPostgresと衝突しやすいため)。初回起動後、テーブル作成と初期商品データの投入をマイグレーションで行う:
+
+```
+cd backend
+npm install
+npm run migration:run
+```
+
+### 2. backend
 
 ```
 cd backend
@@ -28,11 +44,12 @@ npm run start:dev
 
 `.env` で最低限設定するもの:
 
+- `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` … PostgreSQL接続情報。`docker compose up -d db` をそのまま使うなら既定値のままでOK
 - `ADMIN_USER_ID` / `ADMIN_PASSWORD` … 管理画面ログイン用のユーザーID・パスワード。パスワードはランダムな文字列にしてください
 - `ADMIN_NOTIFY_EMAIL` … 新規注文が入ったときに通知を受け取るメールアドレス
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` … メール送信用。未設定でも動作しますが、メールは飛ばずログに出るだけになります
 
-### 2. frontend
+### 3. frontend
 
 ```
 cd frontend
@@ -62,18 +79,19 @@ npm run dev
 ## 本番(AWS)デプロイに向けて、今の設計で意識していること
 
 - **ファイル保存**: 今はローカルディスク(`backend/src/storage/storage.service.ts`)。本番はS3に差し替え予定。呼び出し側はこのクラスのメソッドしか使っていないので、中身の実装をS3 SDK呼び出しに変えるだけで移行できます
-- **データ保存**: 今はJSONファイル(`backend/src/data/orders.repository.ts`)。本番はRDS(Postgres)やDynamoDBを想定。こちらもメソッドのインターフェースは変えずに中身だけ差し替えられる作りにしています
+- **データ保存**: PostgreSQL(TypeORM)。ローカルはDocker、本番はRDS(Postgres)を想定していて、`.env`の`DB_HOST`等の接続情報を向き先ごとに変えるだけで移行できます。スキーマ変更は`backend/src/database/migrations/`配下のマイグレーションファイルで管理しています
 - **メール送信**: `nodemailer`のSMTP経由。AWS SESもSMTPインターフェースを提供しているので、`.env`のSMTP系の値をSESの認証情報に変えるだけでコード変更なしに移行できます
-- **管理者認証**: 今は簡易的な合言葉(APIキー)方式。本番で管理者以外にも権限管理が必要になったら、Cognitoなどに差し替える想定でガード(`common/admin-auth.guard.ts`)を1箇所にまとめています
+- **管理者認証**: 今は簡易的なユーザーID・パスワード方式。本番で管理者以外にも権限管理が必要になったら、Cognitoなどに差し替える想定でガード(`common/admin-auth.guard.ts`)を1箇所にまとめています
 
 ### デプロイのおおまかな流れ(参考)
 
 1. **frontend**: `npm run build` で静的ファイルを生成し、S3 + CloudFront、またはAmplify Hostingで配信
 2. **backend**: Dockerfileを用意済みなので、ECS(Fargate)やElastic Beanstalkにそのままデプロイ可能。まずはEC2に直接Node.jsを立てて動かす形でも十分動きます
-3. **ファイル保存をS3に切り替え**(`storage.service.ts`)、**データ保存をRDSに切り替え**(`orders.repository.ts`)
-4. **メール送信をSES経由に変更**(`.env`の書き換えのみ)
-5. ドメイン・HTTPS(ACM証明書)を設定
+3. **データベースをRDS(Postgres)に切り替え**(`.env`の`DB_*`をRDSの接続情報に変更し、`npm run migration:run`でスキーマを反映)
+4. **ファイル保存をS3に切り替え**(`storage.service.ts`)
+5. **メール送信をSES経由に変更**(`.env`の書き換えのみ)
+6. ドメイン・HTTPS(ACM証明書)を設定
 
 ## 商品ラインナップの変更
 
-`backend/src/products/product.data.ts` を編集するだけで、商品の種類・説明・参考価格を自由に増減できます。
+商品はPostgresの`products`テーブルで管理している。初期データは`backend/src/products/product.data.ts`を元に`backend/src/database/migrations/`のシードマイグレーションで投入される。現状は管理画面からの編集機能はまだないため、商品を増減・変更したい場合は新しいマイグレーションを追加するか、DBに直接INSERT/UPDATEしてください(将来的に管理画面から編集できるようにする前提でテーブル設計しています)。

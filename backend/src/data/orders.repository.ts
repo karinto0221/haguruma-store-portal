@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { promises as fs } from 'fs';
-import * as path from 'path';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { OrderEntity } from '../orders/order.entity';
 import { OrderStatus } from '../orders/order-status';
 
 export { OrderStatus };
@@ -31,72 +32,100 @@ export interface OrdersFilter {
 
 /**
  * 注文データの保存先を抽象化する簡易リポジトリ。
- * 今はJSONファイル(data/orders.json)に保存しているが、
- * 本番でRDS(Postgres)やDynamoDBに移行する際は、このクラスのメソッドの
- * 中身だけ差し替えれば呼び出し側(OrdersService)には影響しない設計にしている。
+ * PostgreSQL(TypeORM)に保存している。呼び出し側(OrdersService)はこのクラスの
+ * メソッドのシグネチャにのみ依存しているため、保存先を差し替える際もここだけの変更で済む。
  */
 @Injectable()
 export class OrdersRepository {
-  private readonly filePath = path.join(process.cwd(), 'data', 'orders.json');
-
-  private async readAll(): Promise<OrderRecord[]> {
-    try {
-      const raw = await fs.readFile(this.filePath, 'utf-8');
-      return JSON.parse(raw);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  private async writeAll(orders: OrderRecord[]) {
-    await fs.mkdir(path.dirname(this.filePath), { recursive: true });
-    await fs.writeFile(this.filePath, JSON.stringify(orders, null, 2), 'utf-8');
-  }
+  constructor(
+    @InjectRepository(OrderEntity)
+    private readonly ordersRepository: Repository<OrderEntity>,
+  ) {}
 
   async create(order: OrderRecord): Promise<OrderRecord> {
-    const orders = await this.readAll();
-    orders.push(order);
-    await this.writeAll(orders);
-    return order;
+    const entity = this.ordersRepository.create({
+      id: order.id,
+      productId: order.productId,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      quantity: order.quantity,
+      notes: order.notes ?? null,
+      fileNames: order.fileNames,
+      filePaths: order.filePaths,
+      status: order.status,
+      paymentLink: order.paymentLink ?? null,
+    });
+    await this.ordersRepository.save(entity);
+
+    const saved = await this.ordersRepository.findOne({
+      where: { id: entity.id },
+      relations: ['product'],
+    });
+    return this.toRecord(saved!);
   }
 
   async findAll(filter: OrdersFilter = {}): Promise<OrderRecord[]> {
-    let orders = await this.readAll();
+    const qb = this.ordersRepository
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.product', 'product')
+      .orderBy('order.createdAt', 'DESC');
 
     if (filter.status) {
-      orders = orders.filter((o) => o.status === filter.status);
+      qb.andWhere('order.status = :status', { status: filter.status });
     }
     if (filter.keyword) {
-      const keyword = filter.keyword.toLowerCase();
-      orders = orders.filter(
-        (o) =>
-          o.customerName.toLowerCase().includes(keyword) ||
-          o.customerEmail.toLowerCase().includes(keyword) ||
-          o.productName.toLowerCase().includes(keyword) ||
-          o.id.toLowerCase().includes(keyword),
+      qb.andWhere(
+        '(order.customerName ILIKE :keyword OR order.customerEmail ILIKE :keyword OR product.name ILIKE :keyword OR CAST(order.id AS text) ILIKE :keyword)',
+        { keyword: `%${filter.keyword}%` },
       );
     }
     if (filter.dateFrom) {
-      orders = orders.filter((o) => o.createdAt >= filter.dateFrom!);
+      qb.andWhere('order.createdAt >= :dateFrom', { dateFrom: filter.dateFrom });
     }
     if (filter.dateTo) {
-      orders = orders.filter((o) => o.createdAt <= filter.dateTo!);
+      qb.andWhere('order.createdAt <= :dateTo', { dateTo: filter.dateTo });
     }
 
-    return orders.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const entities = await qb.getMany();
+    return entities.map((e) => this.toRecord(e));
   }
 
   async findById(id: string): Promise<OrderRecord | undefined> {
-    const orders = await this.readAll();
-    return orders.find((o) => o.id === id);
+    const entity = await this.ordersRepository.findOne({
+      where: { id },
+      relations: ['product'],
+    });
+    return entity ? this.toRecord(entity) : undefined;
   }
 
   async update(id: string, patch: Partial<OrderRecord>): Promise<OrderRecord | undefined> {
-    const orders = await this.readAll();
-    const idx = orders.findIndex((o) => o.id === id);
-    if (idx === -1) return undefined;
-    orders[idx] = { ...orders[idx], ...patch };
-    await this.writeAll(orders);
-    return orders[idx];
+    const entity = await this.ordersRepository.findOne({
+      where: { id },
+      relations: ['product'],
+    });
+    if (!entity) return undefined;
+
+    if (patch.status !== undefined) entity.status = patch.status;
+    if (patch.paymentLink !== undefined) entity.paymentLink = patch.paymentLink;
+
+    await this.ordersRepository.save(entity);
+    return this.toRecord(entity);
+  }
+
+  private toRecord(entity: OrderEntity): OrderRecord {
+    return {
+      id: entity.id,
+      productId: entity.productId,
+      productName: entity.product?.name ?? '',
+      customerName: entity.customerName,
+      customerEmail: entity.customerEmail,
+      quantity: entity.quantity,
+      notes: entity.notes ?? undefined,
+      fileNames: entity.fileNames,
+      filePaths: entity.filePaths,
+      status: entity.status,
+      paymentLink: entity.paymentLink ?? undefined,
+      createdAt: entity.createdAt.toISOString(),
+    };
   }
 }
