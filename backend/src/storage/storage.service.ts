@@ -33,4 +33,13 @@ export class StorageService {
   getFullPath(relativePath: string): string {
     return path.join(this.uploadDir, relativePath);
   }
+
+  async read(relativePath: string): Promise<Buffer> {
+    const baseDir = path.resolve(this.uploadDir);
+    const filePath = path.resolve(baseDir, relativePath);
+    if (filePath !== baseDir && !filePath.startsWith(`${baseDir}${path.sep}`)) {
+      throw new Error('保存領域外のファイルは読み込めません');
+    }
+    return fs.readFile(filePath);
+  }
 }

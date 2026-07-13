@@ -63,6 +63,18 @@ backendを`docker compose`経由で起動する場合はコンテナ間通信用
 
 ## アーキテクチャ
 
+### フロントエンド: feature単位の責務分離
+
+今後、画面や機能を追加・変更する場合は、実装を`frontend/src/features/<feature-name>/`単位で切り出し、既存featureと同じ責務分離を維持すること。画面の実装を`pages`配下の1ファイルへ詰め込まない。
+
+- `frontend/src/pages/*.tsx`: React Routerから参照する薄いエントリーポイント。原則として対応する`features/<feature-name>`を再エクスポートするだけにする。
+- `features/<feature-name>/index.tsx`: ルーティングパラメータの受け取り、hookの呼び出し、`component/`に切り出した子コンポーネントの配置・組み合わせを担当する。詳細なJSXを直接詰め込まず、画面構成が読み取れる薄いコンポーネントにする。
+- `features/<feature-name>/component/`: そのfeature内で使用する表示部品を責務ごとのファイルに分けて配置する。まとまりのあるヘッダー、操作領域、一覧、詳細表示などはindexへ直接記述せず、名前を持つコンポーネントとして切り出す。
+- `features/<feature-name>/hook/`: API取得、フォーム、状態管理、副作用、画面操作などのロジックをカスタムhookとして分離する。
+- `features/<feature-name>/type/`: そのfeature固有のPropsや型定義を配置する。
+
+小規模なfeatureで不要なディレクトリを形式的に作る必要はないが、画面表示・状態管理・部品・型の責務が増えた場合は上記構成へ分割すること。複数featureから利用する汎用部品やロジックは、特定featureへ依存させず、`frontend/src/components/`など適切な共通領域へ配置する。
+
 ### バックエンド: 差し替え可能なインターフェース設計
 
 このコードベースの一貫した設計方針は「呼び出し側は抽象化されたクラスのメソッドシグネチャのみに依存し、実装の中身は環境に応じて差し替えられるようにする」こと。将来的な本番移行(AWS)を見据えたもので、以下の3箇所に現れている。
@@ -81,7 +93,7 @@ backendを`docker compose`経由で起動する場合はコンテナ間通信用
 
 ### 認証はステートレスなヘッダー方式
 
-管理者向けエンドポイント(`GET /orders`, `PATCH /orders/:id/status`, `POST /orders/:id/send-payment-link`)は、リクエストごとに`x-admin-id`/`x-admin-password`ヘッダーを比較検証するのみで、セッションやトークンの概念が無い。フロントエンド(`AdminOrders.tsx`)もログイン情報をReactのstateにしか保持しておらず、リロードで必ずログアウトされる。
+管理者向けエンドポイント(`GET /orders`, `PATCH /orders/:id/status`, `POST /orders/:id/send-payment-link`)は、リクエストごとに`x-admin-id`/`x-admin-password`ヘッダーを比較検証するのみで、サーバー側にセッションやトークンの概念は無い。フロントエンドは`AdminAuthProvider`のReact stateとブラウザの`sessionStorage`に認証情報を保持するため、同じタブのリロードではログイン状態を復元する。ログアウトまたはタブを閉じると認証情報は破棄される。
 
 ### エラーハンドリングの非対称性(既知の挙動)
 

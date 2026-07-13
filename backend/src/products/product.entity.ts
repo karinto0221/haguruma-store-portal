@@ -28,6 +28,12 @@ export class ProductEntity {
   @Column({ name: 'product_category_id', type: 'integer' })
   productCategoryId: number;
 
+  @Column({ name: 'image_data', type: 'bytea', nullable: true, select: false })
+  imageData: Buffer | null;
+
+  @Column({ name: 'image_mime_type', type: 'varchar', length: 100, nullable: true })
+  imageMimeType: string | null;
+
   @ManyToOne(() => ProductCategoryEntity, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'product_category_id' })
   productCategory: ProductCategoryEntity;

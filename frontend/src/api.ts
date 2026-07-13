@@ -7,18 +7,35 @@ export interface Product {
   priceFrom: number;
   productCategoryId: number;
   productCategoryName: string;
+  imageUrl?: string;
+}
+
+function resolveAssetUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  return new URL(url, API_BASE_URL).toString();
+}
+
+function normalizeProduct(product: Product): Product {
+  return { ...product, imageUrl: resolveAssetUrl(product.imageUrl) };
 }
 
 export async function fetchProducts(): Promise<Product[]> {
   const res = await fetch(`${API_BASE_URL}/products`);
   if (!res.ok) throw new Error('商品一覧の取得に失敗しました');
-  return res.json();
+  return ((await res.json()) as Product[]).map(normalizeProduct);
+}
+
+export async function fetchProduct(id: string): Promise<Product> {
+  const res = await fetch(`${API_BASE_URL}/products/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error('商品情報の取得に失敗しました');
+  return normalizeProduct(await res.json());
 }
 
 export interface CreateOrderInput {
   productId: string;
   customerName: string;
   customerEmail: string;
+  customerPhone?: string;
   quantity: number;
   notes?: string;
   files: File[];
@@ -29,6 +46,7 @@ export async function createOrder(input: CreateOrderInput): Promise<{ orderId: s
   form.append('productId', input.productId);
   form.append('customerName', input.customerName);
   form.append('customerEmail', input.customerEmail);
+  if (input.customerPhone) form.append('customerPhone', input.customerPhone);
   form.append('quantity', String(input.quantity));
   if (input.notes) form.append('notes', input.notes);
   input.files.forEach((file) => form.append('files', file));
@@ -74,12 +92,13 @@ export async function loginAdmin(credentials: AdminCredentials): Promise<void> {
   }
 }
 
-export type OrderStatus = 'new' | 'reviewing' | 'payment_link_sent' | 'cancelled';
+export type OrderStatus = 'new' | 'reviewing' | 'payment_link_sent' | 'completed' | 'cancelled';
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   new: '新規注文',
   reviewing: '内容確認中',
   payment_link_sent: 'メール送信済み',
+  completed: '完了',
   cancelled: 'キャンセル',
 };
 
@@ -87,6 +106,7 @@ export const ORDER_STATUS_OPTIONS: OrderStatus[] = [
   'new',
   'reviewing',
   'payment_link_sent',
+  'completed',
   'cancelled',
 ];
 
@@ -95,6 +115,7 @@ export interface OrderRecord {
   productName: string;
   customerName: string;
   customerEmail: string;
+  customerPhone?: string;
   quantity: number;
   notes?: string;
   fileNames: string[];
@@ -108,6 +129,7 @@ export interface OrdersSearchFilter {
   keyword?: string;
   dateFrom?: string;
   dateTo?: string;
+  includeCompleted?: boolean;
 }
 
 export async function fetchOrdersAdmin(
@@ -119,6 +141,7 @@ export async function fetchOrdersAdmin(
   if (filter.keyword) params.set('keyword', filter.keyword);
   if (filter.dateFrom) params.set('dateFrom', filter.dateFrom);
   if (filter.dateTo) params.set('dateTo', filter.dateTo);
+  if (filter.includeCompleted) params.set('includeCompleted', 'true');
 
   const query = params.toString();
   const res = await fetch(`${API_BASE_URL}/orders${query ? `?${query}` : ''}`, {
@@ -126,6 +149,30 @@ export async function fetchOrdersAdmin(
   });
   if (!res.ok) throw new Error('注文一覧の取得に失敗しました(ユーザーID・パスワードを確認してください)');
   return res.json();
+}
+
+export async function fetchOrderAdmin(
+  credentials: AdminCredentials,
+  orderId: string,
+): Promise<OrderRecord> {
+  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
+    headers: adminHeaders(credentials),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '注文詳細の取得に失敗しました'));
+  return res.json();
+}
+
+export async function fetchOrderAttachmentAdmin(
+  credentials: AdminCredentials,
+  orderId: string,
+  fileIndex: number,
+): Promise<Blob> {
+  const res = await fetch(
+    `${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/files/${fileIndex}`,
+    { headers: adminHeaders(credentials) },
+  );
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '添付ファイルの取得に失敗しました'));
+  return res.blob();
 }
 
 export async function updateOrderStatusAdmin(
@@ -165,10 +212,22 @@ export async function sendPaymentLinkAdmin(
 export interface ProductCategory {
   id: number;
   name: string;
+  imageUrl?: string;
 }
 
 export interface ProductCategoryInput {
   name: string;
+  image?: File;
+}
+
+function normalizeCategory(category: ProductCategory): ProductCategory {
+  return { ...category, imageUrl: resolveAssetUrl(category.imageUrl) };
+}
+
+export async function fetchProductCategories(): Promise<ProductCategory[]> {
+  const res = await fetch(`${API_BASE_URL}/product-categories`);
+  if (!res.ok) throw new Error('商品カテゴリ一覧の取得に失敗しました');
+  return ((await res.json()) as ProductCategory[]).map(normalizeCategory);
 }
 
 export async function fetchProductCategoriesAdmin(
@@ -178,7 +237,23 @@ export async function fetchProductCategoriesAdmin(
     headers: adminHeaders(credentials),
   });
   if (!res.ok) throw new Error(await parseErrorMessage(res, '商品カテゴリ一覧の取得に失敗しました'));
-  return res.json();
+  return ((await res.json()) as ProductCategory[]).map(normalizeCategory);
+}
+
+async function uploadCategoryImage(
+  credentials: AdminCredentials,
+  id: number,
+  image: File,
+): Promise<ProductCategory> {
+  const form = new FormData();
+  form.append('image', image);
+  const res = await fetch(`${API_BASE_URL}/product-categories/${id}/image`, {
+    method: 'PUT',
+    headers: adminHeaders(credentials),
+    body: form,
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, 'カテゴリ画像の保存に失敗しました'));
+  return normalizeCategory(await res.json());
 }
 
 export async function createProductCategoryAdmin(
@@ -188,10 +263,11 @@ export async function createProductCategoryAdmin(
   const res = await fetch(`${API_BASE_URL}/product-categories`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ name: input.name }),
   });
   if (!res.ok) throw new Error(await parseErrorMessage(res, '商品カテゴリの作成に失敗しました'));
-  return res.json();
+  const category = normalizeCategory(await res.json());
+  return input.image ? uploadCategoryImage(credentials, category.id, input.image) : category;
 }
 
 export async function updateProductCategoryAdmin(
@@ -202,10 +278,11 @@ export async function updateProductCategoryAdmin(
   const res = await fetch(`${API_BASE_URL}/product-categories/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ name: input.name }),
   });
   if (!res.ok) throw new Error(await parseErrorMessage(res, '商品カテゴリの更新に失敗しました'));
-  return res.json();
+  const category = normalizeCategory(await res.json());
+  return input.image ? uploadCategoryImage(credentials, id, input.image) : category;
 }
 
 export async function deleteProductCategoryAdmin(
@@ -227,6 +304,7 @@ export interface CreateProductInput {
   description: string;
   priceFrom: number;
   productCategoryId: number;
+  image?: File;
 }
 
 export interface UpdateProductInput {
@@ -234,6 +312,7 @@ export interface UpdateProductInput {
   description: string;
   priceFrom: number;
   productCategoryId: number;
+  image?: File;
 }
 
 export async function fetchProductsAdmin(credentials: AdminCredentials): Promise<Product[]> {
@@ -242,7 +321,23 @@ export async function fetchProductsAdmin(credentials: AdminCredentials): Promise
     headers: adminHeaders(credentials),
   });
   if (!res.ok) throw new Error(await parseErrorMessage(res, '商品一覧の取得に失敗しました'));
-  return res.json();
+  return ((await res.json()) as Product[]).map(normalizeProduct);
+}
+
+async function uploadProductImage(
+  credentials: AdminCredentials,
+  id: string,
+  image: File,
+): Promise<Product> {
+  const form = new FormData();
+  form.append('image', image);
+  const res = await fetch(`${API_BASE_URL}/products/${encodeURIComponent(id)}/image`, {
+    method: 'PUT',
+    headers: adminHeaders(credentials),
+    body: form,
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品画像の保存に失敗しました'));
+  return normalizeProduct(await res.json());
 }
 
 export async function createProductAdmin(
@@ -252,10 +347,17 @@ export async function createProductAdmin(
   const res = await fetch(`${API_BASE_URL}/products`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      id: input.id,
+      name: input.name,
+      description: input.description,
+      priceFrom: input.priceFrom,
+      productCategoryId: input.productCategoryId,
+    }),
   });
   if (!res.ok) throw new Error(await parseErrorMessage(res, '商品の作成に失敗しました'));
-  return res.json();
+  const product = normalizeProduct(await res.json());
+  return input.image ? uploadProductImage(credentials, product.id, input.image) : product;
 }
 
 export async function updateProductAdmin(
@@ -266,10 +368,16 @@ export async function updateProductAdmin(
   const res = await fetch(`${API_BASE_URL}/products/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      name: input.name,
+      description: input.description,
+      priceFrom: input.priceFrom,
+      productCategoryId: input.productCategoryId,
+    }),
   });
   if (!res.ok) throw new Error(await parseErrorMessage(res, '商品の更新に失敗しました'));
-  return res.json();
+  const product = normalizeProduct(await res.json());
+  return input.image ? uploadProductImage(credentials, id, input.image) : product;
 }
 
 export async function deleteProductAdmin(credentials: AdminCredentials, id: string): Promise<void> {

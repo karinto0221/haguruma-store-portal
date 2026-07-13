@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductEntity } from './product.entity';
@@ -12,6 +17,12 @@ export interface ProductRecord {
   priceFrom: number;
   productCategoryId: number;
   productCategoryName: string;
+  imageUrl?: string;
+}
+
+export interface CatalogImage {
+  data: Buffer;
+  mimeType: string;
 }
 
 // Postgresの一意制約違反(id重複) / 外部キー制約違反(参照している注文が残っている状態で削除しようとした)
@@ -39,6 +50,35 @@ export class ProductsService {
       relations: ['productCategory'],
     });
     return entity ? this.toRecord(entity) : undefined;
+  }
+
+  async findImage(id: string): Promise<CatalogImage> {
+    const entity = await this.productsRepository
+      .createQueryBuilder('product')
+      .addSelect('product.imageData')
+      .where('product.id = :id', { id })
+      .getOne();
+    if (!entity) throw new NotFoundException('指定された商品が見つかりません');
+    if (!entity.imageData || !entity.imageMimeType) {
+      throw new NotFoundException('商品画像が登録されていません');
+    }
+    return { data: entity.imageData, mimeType: entity.imageMimeType };
+  }
+
+  async updateImage(id: string, file?: Express.Multer.File): Promise<ProductRecord> {
+    if (!file || !file.mimetype.startsWith('image/')) {
+      throw new BadRequestException('画像ファイルを選択してください');
+    }
+    const entity = await this.productsRepository.findOne({ where: { id } });
+    if (!entity) throw new NotFoundException('指定された商品が見つかりません');
+    entity.imageData = file.buffer;
+    entity.imageMimeType = file.mimetype;
+    await this.productsRepository.save(entity);
+    const saved = await this.productsRepository.findOne({
+      where: { id },
+      relations: ['productCategory'],
+    });
+    return this.toRecord(saved!);
   }
 
   async create(dto: CreateProductDto): Promise<ProductRecord> {
@@ -124,6 +164,9 @@ export class ProductsService {
       priceFrom: entity.priceFrom,
       productCategoryId: entity.productCategoryId,
       productCategoryName: entity.productCategory?.name ?? '',
+      imageUrl: entity.imageMimeType
+        ? `/products/${encodeURIComponent(entity.id)}/image?v=${entity.updatedAt.getTime()}`
+        : undefined,
     };
   }
 }

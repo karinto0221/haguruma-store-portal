@@ -12,6 +12,7 @@ export interface OrderRecord {
   productName: string;
   customerName: string;
   customerEmail: string;
+  customerPhone?: string;
   quantity: number;
   notes?: string;
   fileNames: string[];
@@ -23,7 +24,8 @@ export interface OrderRecord {
 
 export interface OrdersFilter {
   status?: OrderStatus;
-  // 顧客名・メール・商品名・注文IDのいずれかに部分一致すれば該当とみなす
+  includeCompleted?: boolean;
+  // 顧客名・メール・電話番号・商品名・注文IDのいずれかに部分一致すれば該当とみなす
   keyword?: string;
   // createdAt (ISO文字列) の範囲。両端を含む
   dateFrom?: string;
@@ -48,6 +50,7 @@ export class OrdersRepository {
       productId: order.productId,
       customerName: order.customerName,
       customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone ?? null,
       quantity: order.quantity,
       notes: order.notes ?? null,
       fileNames: order.fileNames,
@@ -72,10 +75,12 @@ export class OrdersRepository {
 
     if (filter.status) {
       qb.andWhere('order.status = :status', { status: filter.status });
+    } else if (!filter.includeCompleted) {
+      qb.andWhere('order.status != :completedStatus', { completedStatus: 'completed' });
     }
     if (filter.keyword) {
       qb.andWhere(
-        '(order.customerName ILIKE :keyword OR order.customerEmail ILIKE :keyword OR product.name ILIKE :keyword OR CAST(order.id AS text) ILIKE :keyword)',
+        '(order.customerName ILIKE :keyword OR order.customerEmail ILIKE :keyword OR order.customerPhone ILIKE :keyword OR product.name ILIKE :keyword OR CAST(order.id AS text) ILIKE :keyword)',
         { keyword: `%${filter.keyword}%` },
       );
     }
@@ -119,6 +124,7 @@ export class OrdersRepository {
       productName: entity.product?.name ?? '',
       customerName: entity.customerName,
       customerEmail: entity.customerEmail,
+      customerPhone: entity.customerPhone ?? undefined,
       quantity: entity.quantity,
       notes: entity.notes ?? undefined,
       fileNames: entity.fileNames,

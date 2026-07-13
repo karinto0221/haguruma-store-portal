@@ -11,6 +11,7 @@
 ├───────────────────────┤ 1     N ├────────────────────┤ 1     N ├─────────────────────────────┤
 │ PK id (serial)           │◄────────│ FK product_category_id│         │ FK product_id (varchar)       │
 │    name                   │         │ PK id (varchar)      │◄────────│ PK id (uuid)                  │
+│    image_data (bytea)     │         │    image_data (bytea) │         │    customer_phone             │
 │    created_at             │         │    name               │         │    customer_name              │
 │    updated_at             │         │    description        │         │    customer_email             │
 └───────────────────────┘         │    price_from         │         │    quantity                   │
@@ -36,12 +37,14 @@
 |---|---|---|---|---|
 | id | serial(integer) | NOT NULL | 自動採番 | 主キー |
 | name | varchar(255) | NOT NULL | - | カテゴリ名 |
+| image_data | bytea | NULL可 | - | カテゴリ画像のバイナリ。API一覧では返さず画像取得APIのみで読み込む |
+| image_mime_type | varchar(100) | NULL可 | - | 画像のMIMEタイプ(`image/jpeg`等) |
 | created_at | timestamptz | NOT NULL | now() | 作成日時 |
 | updated_at | timestamptz | NOT NULL | now() | 更新日時(TypeORMの`@UpdateDateColumn`により自動更新) |
 
 - 主キー制約: `PK_product_categories_id` (id)
 - 初期データ(9件、`id`は投入順の連番): 封筒・袋 / パッケージ・箱・フォルダー / 名刺 / カード・ペーパー / 冊子・ブックレット・ZINE / ポケットフォルダー / ペーパータグ・下げ札 / シール・ステッカー・商品ラベル / ラッピングペーパー・薄葉紙
-- カテゴリの追加・編集・削除を行うAPI/画面は未実装。現状はマイグレーション追加、またはDBへの直接操作で管理する。
+- カテゴリの追加・編集・削除は管理画面(`/admin/master/product-categories`)から`GET/POST/PATCH/DELETE /product-categories`経由で行える(API定義書3.10〜3.13参照)。参照している商品が残っている状態での削除は外部キー制約により失敗する。
 
 ### 2.2 products(商品マスタ)
 
@@ -52,13 +55,15 @@
 | description | text | NOT NULL | - | 商品説明 |
 | price_from | integer | NOT NULL | - | 参考価格(円)。実際は数量・仕様で変動する目安価格 |
 | product_category_id | integer | NOT NULL | - | `product_categories.id`への外部キー |
+| image_data | bytea | NULL可 | - | 商品画像のバイナリ。API一覧では返さず画像取得APIのみで読み込む |
+| image_mime_type | varchar(100) | NULL可 | - | 画像のMIMEタイプ |
 | created_at | timestamptz | NOT NULL | now() | 作成日時 |
 | updated_at | timestamptz | NOT NULL | now() | 更新日時(TypeORMの`@UpdateDateColumn`により自動更新) |
 
 - 主キー制約: `PK_0806c755e0aca124e67c0cf6d7d` (id)
 - 外部キー制約: `FK_products_product_category_id` (product_category_id → product_categories.id, ON DELETE RESTRICT, ON UPDATE NO ACTION)
-- 商品の追加・編集・削除を行うAPI/画面は未実装。現状はマイグレーション追加、またはDBへの直接操作で管理する。
-- 現在の`GET /products`のAPIレスポンスにはカテゴリ情報を含めていない(DB上はカテゴリ必須だが、APIレスポンスへの反映は未実装。`backend/src/products/products.service.ts`の`toProduct()`参照)。
+- 商品の追加・編集・削除は管理画面(`/admin/master/products`)から`GET/POST/PATCH/DELETE /products`経由で行える(API定義書3.1、3.7〜3.9参照)。`id`は作成後変更不可。参照している注文が残っている状態での削除は外部キー制約により失敗する。
+- `GET /products`のAPIレスポンスには`productCategoryId`・`productCategoryName`(`product_categories`とのJOIN結果)が含まれる。このエンドポイントはお客様向け(商品選択画面)と管理画面(商品マスタ一覧)の両方から共通で使われている。
 
 ### 2.3 orders(注文)
 
@@ -68,6 +73,7 @@
 | product_id | varchar(50) | NOT NULL | - | `products.id`への外部キー |
 | customer_name | varchar(255) | NOT NULL | - | 注文者氏名 |
 | customer_email | varchar(255) | NOT NULL | - | 注文者メールアドレス |
+| customer_phone | varchar(50) | NULL可 | - | 注文者電話番号(任意入力) |
 | quantity | integer | NOT NULL | - | 数量(1以上、DTOバリデーションのみでDB制約は無し) |
 | notes | text | NULL可 | - | 備考・要望 |
 | file_names | text[] | NOT NULL | `{}` | アップロードされたファイルの元ファイル名一覧 |
@@ -90,6 +96,7 @@
 | `new` | 新規注文 | 注文受付直後の初期状態 |
 | `reviewing` | 内容確認中 | 管理者が内容確認中であることを手動でマークした状態 |
 | `payment_link_sent` | メール送信済み | 支払いリンク送信済み(`POST /orders/:id/send-payment-link`実行後に自動遷移。管理画面から手動でもセット可能) |
+| `completed` | 完了 | 管理者が注文対応完了として手動で設定した状態。注文一覧では既定で除外される |
 | `cancelled` | キャンセル | 管理者が手動でキャンセル扱いにした状態 |
 
 - ステータス間の遷移に業務ルール上の制約は無く、管理画面からどの値へも自由に変更可能(アプリケーション層・DB層とも遷移制約なし)。
@@ -115,6 +122,8 @@
 | `1783676979855-InitSchema.ts` | `products`テーブル、`order_status`型、`orders`テーブル、上記インデックス・外部キーを作成 |
 | `1783676979856-SeedProducts.ts` | `backend/src/products/product.data.ts`に定義された初期商品5件(名刺・封筒・ポストカード・ラッピングペーパー・パッケージボックス)を`products`にINSERT |
 | `1783908720243-AddProductCategories.ts` | `product_categories`テーブルを新設し初期カテゴリ9件をINSERT。`products`に`product_category_id`列を追加し、既存5商品にカテゴリを割り当てた上でNOT NULL制約・外部キーを付与 |
+| `1783910000000-AddCatalogImagesAndCustomerPhone.ts` | `product_categories`・`products`に画像バイナリ/MIME列を追加し、`orders`に任意の電話番号列を追加 |
+| `1783911000000-AddCompletedOrderStatus.ts` | PostgreSQL ENUM `order_status`へ`completed`を追加。ロールバック時は`completed`の注文を`reviewing`へ戻してENUMを再作成 |
 
 運用コマンド(`backend/package.json`):
 
@@ -139,7 +148,9 @@ npm run migration:revert                                       # 直近のマイ
 ## 6. 現状の制約・今後の検討事項
 
 - `product_categories`・`products`・`orders`以外にテーブルは存在しない。管理者アカウント情報はDBではなく環境変数(`ADMIN_USER_ID`/`ADMIN_PASSWORD`)で管理しており、複数管理者アカウントには対応していない。
-- `products.product_category_id`はDB上NOT NULLだが、`GET /products`のAPIレスポンスにはカテゴリ情報が含まれていない(未実装)。画面上でカテゴリ別に絞り込む機能も無い。
+- お客様向け画面はカテゴリ選択後、取得済みの商品一覧を`product_category_id`でフロント側絞り込みして表示する。専用のカテゴリ別商品APIは無い。
+- カテゴリ画像・商品画像は現時点ではDBの`bytea`列に保存する。公開APIは画像本体を一覧JSONへ埋め込まず、専用画像URLを返す。将来S3等へ移行する場合はこのURL契約を維持しつつ保存・配信実装を差し替える想定。
 - アップロードファイルの実体(バイナリ)はDBに保存されておらず、`UPLOAD_DIR`配下のローカルディスクに保存される。`orders.file_paths`はその参照パスのみを保持する。
 - `quantity`が1以上であることのDB制約(CHECK制約)は無く、アプリケーション層(DTOバリデーション)のみで担保している。
-- 論理削除の仕組みは無い(注文・商品ともに物理削除のみ想定。ただし商品削除APIは未実装)。
+- 論理削除の仕組みは無い(注文・商品・商品カテゴリともに物理削除のみ。削除時は`ON DELETE RESTRICT`により参照整合性を保っている)。
+- 商品作成時の`id`重複チェックはDBの一意制約違反(`23505`)をアプリ層で捕捉して409を返す方式。TypeORMの`repository.save()`は主キーが既存だとUPDATEになってしまうため、`repository.insert()`を使う必要がある点に注意(`backend/src/products/products.service.ts`の`create()`参照。過去に`save()`を使っていて既存商品を上書きしてしまう不具合があった)。

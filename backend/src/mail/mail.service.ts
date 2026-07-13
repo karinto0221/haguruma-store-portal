@@ -42,6 +42,7 @@ export class MailService {
     productName: string;
     customerName: string;
     customerEmail: string;
+    customerPhone?: string;
     quantity: number;
     notes?: string;
     fileNames: string[];
@@ -60,6 +61,7 @@ export class MailService {
       <p>商品: ${params.productName}</p>
       <p>お客様名: ${params.customerName}</p>
       <p>お客様メール: ${params.customerEmail}</p>
+      <p>お客様電話番号: ${params.customerPhone || 'なし'}</p>
       <p>数量: ${params.quantity}</p>
       <p>備考: ${params.notes || "なし"}</p>
       <p>アップロードファイル: ${params.fileNames.join(", ") || "なし"}</p>

@@ -1,5 +1,16 @@
 import { Product, ProductCategory, CreateProductInput, UpdateProductInput } from '@/api';
 
+export interface ProductSearchFilter {
+  name: string;
+  categoryId: number | '';
+}
+
+export interface ProductSearchProps {
+  filter: ProductSearchFilter;
+  onFilterChange: (filter: ProductSearchFilter) => void;
+  categories: ProductCategory[];
+}
+
 export interface ProductTableProps {
   products: Product[];
   loading: boolean;

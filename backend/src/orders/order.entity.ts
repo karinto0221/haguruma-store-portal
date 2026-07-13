@@ -31,6 +31,9 @@ export class OrderEntity {
   @Column({ name: 'customer_email', type: 'varchar', length: 255 })
   customerEmail: string;
 
+  @Column({ name: 'customer_phone', type: 'varchar', length: 50, nullable: true })
+  customerPhone: string | null;
+
   @Column({ type: 'integer' })
   quantity: number;
 

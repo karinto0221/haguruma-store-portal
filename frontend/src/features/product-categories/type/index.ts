@@ -1,5 +1,10 @@
 import { ProductCategory, ProductCategoryInput } from '@/api';
 
+export interface ProductCategorySearchProps {
+  keyword: string;
+  onKeywordChange: (keyword: string) => void;
+}
+
 export interface ProductCategoryTableProps {
   categories: ProductCategory[];
   loading: boolean;

@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   fetchOrdersAdmin,
-  sendPaymentLinkAdmin,
-  updateOrderStatusAdmin,
   OrderRecord,
-  OrderStatus,
   OrdersSearchFilter,
 } from '@/api';
 import { useAdminAuth } from '@/features/admin-auth';
@@ -14,6 +11,7 @@ const EMPTY_FILTER: OrdersSearchFilter = {
   keyword: '',
   dateFrom: '',
   dateTo: '',
+  includeCompleted: false,
 };
 
 export function useAdminOrders() {
@@ -22,7 +20,6 @@ export function useAdminOrders() {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [linkInputs, setLinkInputs] = useState<Record<string, string>>({});
 
   const load = async (appliedFilter: OrdersSearchFilter) => {
     if (!credentials) return;
@@ -53,43 +50,13 @@ export function useAdminOrders() {
     await load(EMPTY_FILTER);
   };
 
-  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
-    if (!credentials) return;
-    try {
-      await updateOrderStatusAdmin(credentials, orderId, status);
-      await load(filter);
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
-
-  const handleSend = async (orderId: string) => {
-    if (!credentials) return;
-    const link = linkInputs[orderId];
-    if (!link) return;
-    try {
-      await sendPaymentLinkAdmin(credentials, orderId, link);
-      await load(filter);
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
-
-  const handleLinkChange = (orderId: string, value: string) => {
-    setLinkInputs((prev) => ({ ...prev, [orderId]: value }));
-  };
-
   return {
     filter,
     setFilter,
     orders,
     error,
     loading,
-    linkInputs,
     handleSearch,
     handleResetFilter,
-    handleStatusChange,
-    handleSend,
-    handleLinkChange,
   };
 }

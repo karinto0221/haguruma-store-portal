@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import MasterTableViewport from '@/components/master/MasterTableViewport';
 import {
   Table,
   TableBody,
@@ -9,43 +10,60 @@ import {
 } from '@/components/ui/table';
 import { ProductTableProps } from '../type';
 
-export default function ProductTable({ products, loading, onEdit, onDelete }: ProductTableProps) {
-  if (loading) {
-    return <p style={{ color: 'var(--color-muted)', fontSize: 14 }}>読み込み中...</p>;
-  }
-  if (products.length === 0) {
-    return <p style={{ color: 'var(--color-muted)', fontSize: 14 }}>商品がまだありません。</p>;
-  }
+const COLUMN_COUNT = 5;
 
+export default function ProductTable({ products, loading, onEdit, onDelete }: ProductTableProps) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>ID</TableHead>
-          <TableHead>商品名</TableHead>
-          <TableHead>カテゴリ</TableHead>
-          <TableHead>参考価格</TableHead>
-          <TableHead className="text-right">操作</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {products.map((p) => (
-          <TableRow key={p.id}>
-            <TableCell>{p.id}</TableCell>
-            <TableCell>{p.name}</TableCell>
-            <TableCell>{p.productCategoryName}</TableCell>
-            <TableCell>¥{p.priceFrom.toLocaleString()}〜</TableCell>
-            <TableCell className="text-right">
-              <Button variant="link" size="sm" onClick={() => onEdit(p)}>
-                編集
-              </Button>
-              <Button variant="link" size="sm" onClick={() => onDelete(p)}>
-                削除
-              </Button>
-            </TableCell>
+    <MasterTableViewport>
+      <Table className="master-table product-master-table">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-40">ID</TableHead>
+            <TableHead>商品名</TableHead>
+            <TableHead className="w-40">カテゴリ</TableHead>
+            <TableHead className="w-32">参考価格</TableHead>
+            <TableHead className="w-32 text-right">操作</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            <TableRow>
+              <TableCell
+                colSpan={COLUMN_COUNT}
+                style={{ textAlign: 'center', color: 'var(--color-muted)' }}
+              >
+                読み込み中...
+              </TableCell>
+            </TableRow>
+          ) : products.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={COLUMN_COUNT}
+                style={{ textAlign: 'center', color: 'var(--color-muted)' }}
+              >
+                該当する商品がありません。
+              </TableCell>
+            </TableRow>
+          ) : (
+            products.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell>{p.id}</TableCell>
+                <TableCell>{p.name}</TableCell>
+                <TableCell>{p.productCategoryName}</TableCell>
+                <TableCell>¥{p.priceFrom.toLocaleString()}〜</TableCell>
+                <TableCell className="text-right">
+                  <Button variant="link" size="sm" onClick={() => onEdit(p)}>
+                    編集
+                  </Button>
+                  <Button variant="link" size="sm" onClick={() => onDelete(p)}>
+                    削除
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </MasterTableViewport>
   );
 }

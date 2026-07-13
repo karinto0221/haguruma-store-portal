@@ -14,6 +14,8 @@ export default function OrderForm() {
     setCustomerName,
     customerEmail,
     setCustomerEmail,
+    customerPhone,
+    setCustomerPhone,
     quantity,
     setQuantity,
     notes,
@@ -27,8 +29,13 @@ export default function OrderForm() {
 
   return (
     <div className="page">
+      {product && (
+        <button className="back-link" onClick={() => window.history.back()} type="button">
+          ← 商品詳細へ戻る
+        </button>
+      )}
       <div className="header">
-        <span className="stamp">2</span>
+        <span className="stamp">4</span>
         <h1>ご注文内容の入力</h1>
       </div>
       <p className="subtitle">
@@ -57,6 +64,18 @@ export default function OrderForm() {
             required
             value={customerEmail}
             onChange={(e) => setCustomerEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <Label htmlFor="customerPhone">電話番号（任意）</Label>
+          <Input
+            id="customerPhone"
+            type="tel"
+            autoComplete="tel"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            placeholder="090-1234-5678"
           />
         </div>
 

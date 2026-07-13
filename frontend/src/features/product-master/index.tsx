@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import MasterPageLayout from '@/components/master/MasterPageLayout';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,14 +14,26 @@ import { CreateProductInput, Product, UpdateProductInput } from '@/api';
 import { useProductMaster } from './hook/useProductMaster';
 import ProductTable from './component/ProductTable';
 import ProductFormDialog from './component/ProductFormDialog';
+import ProductSearch from './component/ProductSearch';
+import { ProductSearchFilter } from './type';
+
+const EMPTY_FILTER: ProductSearchFilter = { name: '', categoryId: '' };
 
 export default function ProductMaster() {
   const { products, categories, loading, error, create, update, remove } = useProductMaster();
+  const [filter, setFilter] = useState<ProductSearchFilter>(EMPTY_FILTER);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [deleteError, setDeleteError] = useState('');
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const filteredProducts = products.filter((p) => {
+    const nameQuery = filter.name.trim().toLowerCase();
+    const nameMatches = !nameQuery || p.name.toLowerCase().includes(nameQuery);
+    const categoryMatches = filter.categoryId === '' || p.productCategoryId === filter.categoryId;
+    return nameMatches && categoryMatches;
+  });
 
   const openCreate = () => {
     setEditing(null);
@@ -61,28 +73,28 @@ export default function ProductMaster() {
   };
 
   return (
-    <div className="page page-wide">
-      <div className="header">
-        <span className="kicker">MASTER</span>
-        <h1>商品マスタ</h1>
-        <Button
-          style={{ marginLeft: 'auto', width: 'auto' }}
-          onClick={openCreate}
-          disabled={categories.length === 0}
-        >
-          新規作成
-        </Button>
-      </div>
-      <p className="subtitle">商品の一覧・登録・編集・削除ができます。</p>
+    <MasterPageLayout
+      title="商品マスタ"
+      description="商品の一覧・登録・編集・削除ができます。"
+      createDisabled={categories.length === 0}
+      onCreate={openCreate}
+    >
       {categories.length === 0 && !loading && (
         <div className="error-box">
           先に商品カテゴリを1件以上作成してください。
         </div>
       )}
 
+      <ProductSearch filter={filter} onFilterChange={setFilter} categories={categories} />
+
       {error && <div className="error-box">{error}</div>}
 
-      <ProductTable products={products} loading={loading} onEdit={openEdit} onDelete={openDelete} />
+      <ProductTable
+        products={filteredProducts}
+        loading={loading}
+        onEdit={openEdit}
+        onDelete={openDelete}
+      />
 
       <ProductFormDialog
         open={formOpen}
@@ -115,6 +127,6 @@ export default function ProductMaster() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </MasterPageLayout>
   );
 }

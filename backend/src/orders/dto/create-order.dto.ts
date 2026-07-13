@@ -13,6 +13,10 @@ export class CreateOrderDto {
   @IsEmail()
   customerEmail: string;
 
+  @IsOptional()
+  @IsString()
+  customerPhone?: string;
+
   @Type(() => Number)
   @IsInt()
   @Min(1)

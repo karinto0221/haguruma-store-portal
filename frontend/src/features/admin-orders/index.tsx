@@ -1,29 +1,28 @@
-import { useAdminOrders } from './hook/useAdminOrders';
-import OrderSearchFilter from './component/OrderSearchFilter';
-import OrderList from './component/OrderList';
+import { useAdminOrders } from "./hook/useAdminOrders";
+import OrderSearchFilter from "./component/OrderSearchFilter";
+import OrderList from "./component/OrderList";
 
 export default function AdminOrders() {
+  const navigate = useNavigate();
   const {
     filter,
     setFilter,
     orders,
     error,
     loading,
-    linkInputs,
     handleSearch,
     handleResetFilter,
-    handleStatusChange,
-    handleSend,
-    handleLinkChange,
   } = useAdminOrders();
 
   return (
     <div className="page page-wide">
       <div className="header">
-        <span className="kicker">ADMIN</span>
+        <span className="kicker">ORDERS</span>
         <h1>注文管理</h1>
       </div>
-      <p className="subtitle">注文一覧の確認・検索と、支払いリンクの送信ができます。</p>
+      <p className="subtitle">
+        注文内容を検索し、カードを選択すると詳細を確認できます。
+      </p>
 
       <OrderSearchFilter
         filter={filter}
@@ -33,16 +32,18 @@ export default function AdminOrders() {
         onReset={handleResetFilter}
       />
 
-      {error && <div className="error-box" style={{ marginTop: 20 }}>{error}</div>}
+      {error && (
+        <div className="error-box" style={{ marginTop: 20 }}>
+          {error}
+        </div>
+      )}
 
       <OrderList
         orders={orders}
         loading={loading}
-        linkInputs={linkInputs}
-        onLinkChange={handleLinkChange}
-        onSend={handleSend}
-        onStatusChange={handleStatusChange}
+        onSelect={(orderId) => navigate(`/admin/orders/${orderId}`)}
       />
     </div>
   );
 }
+import { useNavigate } from "react-router-dom";

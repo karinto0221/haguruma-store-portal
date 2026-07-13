@@ -1,77 +1,52 @@
-import { OrderStatus, ORDER_STATUS_LABELS, ORDER_STATUS_OPTIONS } from '@/api';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { OrderRowProps } from '../type';
+import { OrderStatus, ORDER_STATUS_LABELS } from "@/api";
+import { OrderRowProps } from "../type";
 
-// ステータスは「色付きバッジに見えるドロップダウン」という特殊な見た目のため、
-// shadcnのSelect(標準的な四角いフォームコントロールの見た目)は使わずネイティブ<select>のまま実装する。
+// 一覧では現在ステータスを色付きバッジとして表示し、変更操作は詳細画面へ集約する。
 const STATUS_BADGE_CLASS: Record<OrderStatus, string> = {
-  new: 'badge-new',
-  reviewing: 'badge-reviewing',
-  payment_link_sent: 'badge-sent',
-  cancelled: 'badge-cancelled',
+  new: "badge-new",
+  reviewing: "badge-reviewing",
+  payment_link_sent: "badge-sent",
+  completed: "badge-completed",
+  cancelled: "badge-cancelled",
 };
 
-export default function OrderRow({
-  order,
-  linkValue,
-  onLinkChange,
-  onSend,
-  onStatusChange,
-}: OrderRowProps) {
+export default function OrderRow({ order, onSelect }: OrderRowProps) {
   return (
-    <div className="order-row">
+    <button
+      type="button"
+      className="order-row order-summary-card"
+      onClick={onSelect}
+    >
       <div className="top-line">
-        <span className="name">
-          {order.productName} / {order.customerName}様
+        <span className="name">注文ID：{order.id}</span>
+        <span className={`badge ${STATUS_BADGE_CLASS[order.status]}`}>
+          {ORDER_STATUS_LABELS[order.status]}
         </span>
-        <select
-          className={`badge badge-select ${STATUS_BADGE_CLASS[order.status]}`}
-          value={order.status}
-          onChange={(e) => onStatusChange(e.target.value as OrderStatus)}
-        >
-          {ORDER_STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {ORDER_STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
       </div>
-      <div className="meta">
-        {order.customerEmail} ・ 数量 {order.quantity} ・{' '}
-        {new Date(order.createdAt).toLocaleString('ja-JP')}
-        <br />
-        注文ID: {order.id}
-        {order.notes && (
-          <>
-            <br />
-            備考: {order.notes}
-          </>
-        )}
-        {order.fileNames.length > 0 && (
-          <>
-            <br />
-            添付: {order.fileNames.join(', ')}
-          </>
-        )}
+      <dl className="order-summary-grid">
+        <div>
+          <dt>商品名</dt>
+          <dd>{order.productName}</dd>
+        </div>
+        <div>
+          <dt>注文者</dt>
+          <dd>{order.customerName}様</dd>
+        </div>
+        <div>
+          <dt>数量</dt>
+          <dd>{order.quantity}</dd>
+        </div>
+        <div>
+          <dt>受付日時</dt>
+          <dd>{new Date(order.createdAt).toLocaleString("ja-JP")}</dd>
+        </div>
+      </dl>
+      <div className="order-summary-footer">
+        <span>
+          <strong>注文ID</strong> {order.id}
+        </span>
+        <span className="order-detail-link">詳細を見る →</span>
       </div>
-      {order.status === 'payment_link_sent' ? (
-        <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>
-          送信済みリンク: {order.paymentLink}
-        </div>
-      ) : (
-        <div className="link-form">
-          <Input
-            type="url"
-            placeholder="支払いリンクを入力(https://...)"
-            value={linkValue}
-            onChange={(e) => onLinkChange(e.target.value)}
-          />
-          <Button type="button" onClick={onSend}>
-            送信
-          </Button>
-        </div>
-      )}
-    </div>
+    </button>
   );
 }

@@ -1,4 +1,4 @@
-import { OrderRecord, OrderStatus, OrdersSearchFilter } from '@/api';
+import { OrderRecord, OrdersSearchFilter } from '@/api';
 
 export interface OrderSearchFilterProps {
   filter: OrdersSearchFilter;
@@ -10,17 +10,11 @@ export interface OrderSearchFilterProps {
 
 export interface OrderRowProps {
   order: OrderRecord;
-  linkValue: string;
-  onLinkChange: (value: string) => void;
-  onSend: () => void;
-  onStatusChange: (status: OrderStatus) => void;
+  onSelect: () => void;
 }
 
 export interface OrderListProps {
   orders: OrderRecord[];
   loading: boolean;
-  linkInputs: Record<string, string>;
-  onLinkChange: (orderId: string, value: string) => void;
-  onSend: (orderId: string) => void;
-  onStatusChange: (orderId: string, status: OrderStatus) => void;
+  onSelect: (orderId: string) => void;
 }

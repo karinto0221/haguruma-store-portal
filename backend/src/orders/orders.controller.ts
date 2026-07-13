@@ -3,14 +3,18 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { SendPaymentLinkDto } from './dto/send-payment-link.dto';
@@ -37,6 +41,29 @@ export class OrdersController {
   @Get()
   async findAll(@Query() query: QueryOrdersDto) {
     return this.ordersService.findAll(query);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get(':id/files/:fileIndex')
+  async findFile(
+    @Param('id') id: string,
+    @Param('fileIndex', ParseIntPipe) fileIndex: number,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const file = await this.ordersService.findFile(id, fileIndex);
+    response.set({
+      'Content-Type': file.mimeType,
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    return new StreamableFile(file.buffer);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get(':id')
+  async findById(@Param('id') id: string) {
+    return this.ordersService.findById(id);
   }
 
   // 管理者向け: ステータスの手動変更 (内容確認中への変更・キャンセルなど)

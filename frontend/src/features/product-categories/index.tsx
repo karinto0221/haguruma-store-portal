@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import MasterPageLayout from '@/components/master/MasterPageLayout';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,14 +14,20 @@ import { ProductCategory, ProductCategoryInput } from '@/api';
 import { useProductCategories } from './hook/useProductCategories';
 import ProductCategoryTable from './component/ProductCategoryTable';
 import ProductCategoryFormDialog from './component/ProductCategoryFormDialog';
+import ProductCategorySearch from './component/ProductCategorySearch';
 
 export default function ProductCategories() {
   const { categories, loading, error, create, update, remove } = useProductCategories();
+  const [keyword, setKeyword] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ProductCategory | null>(null);
   const [deleting, setDeleting] = useState<ProductCategory | null>(null);
   const [deleteError, setDeleteError] = useState('');
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const filteredCategories = categories.filter((c) =>
+    c.name.toLowerCase().includes(keyword.trim().toLowerCase()),
+  );
 
   const openCreate = () => {
     setEditing(null);
@@ -61,20 +67,17 @@ export default function ProductCategories() {
   };
 
   return (
-    <div className="page page-wide">
-      <div className="header">
-        <span className="kicker">MASTER</span>
-        <h1>商品カテゴリ</h1>
-        <Button style={{ marginLeft: 'auto', width: 'auto' }} onClick={openCreate}>
-          新規作成
-        </Button>
-      </div>
-      <p className="subtitle">商品カテゴリの一覧・登録・編集・削除ができます。</p>
+    <MasterPageLayout
+      title="商品カテゴリ"
+      description="商品カテゴリの一覧・登録・編集・削除ができます。"
+      onCreate={openCreate}
+    >
+      <ProductCategorySearch keyword={keyword} onKeywordChange={setKeyword} />
 
       {error && <div className="error-box">{error}</div>}
 
       <ProductCategoryTable
-        categories={categories}
+        categories={filteredCategories}
         loading={loading}
         onEdit={openEdit}
         onDelete={openDelete}
@@ -110,6 +113,6 @@ export default function ProductCategories() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </MasterPageLayout>
   );
 }

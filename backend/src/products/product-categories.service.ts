@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductCategoryEntity } from './product-category.entity';
@@ -8,6 +13,12 @@ import { UpdateProductCategoryDto } from './dto/update-product-category.dto';
 export interface ProductCategoryRecord {
   id: number;
   name: string;
+  imageUrl?: string;
+}
+
+export interface CategoryImage {
+  data: Buffer;
+  mimeType: string;
 }
 
 // Postgresの外部キー制約違反(この場合: 参照している商品が残っている状態でカテゴリを削除しようとした)
@@ -27,6 +38,34 @@ export class ProductCategoriesService {
 
   async create(dto: CreateProductCategoryDto): Promise<ProductCategoryRecord> {
     const entity = this.repository.create({ name: dto.name });
+    await this.repository.save(entity);
+    return this.toRecord(entity);
+  }
+
+  async findImage(id: number): Promise<CategoryImage> {
+    const entity = await this.repository
+      .createQueryBuilder('category')
+      .addSelect('category.imageData')
+      .where('category.id = :id', { id })
+      .getOne();
+    if (!entity) throw new NotFoundException('指定された商品カテゴリが見つかりません');
+    if (!entity.imageData || !entity.imageMimeType) {
+      throw new NotFoundException('カテゴリ画像が登録されていません');
+    }
+    return { data: entity.imageData, mimeType: entity.imageMimeType };
+  }
+
+  async updateImage(
+    id: number,
+    file?: Express.Multer.File,
+  ): Promise<ProductCategoryRecord> {
+    if (!file || !file.mimetype.startsWith('image/')) {
+      throw new BadRequestException('画像ファイルを選択してください');
+    }
+    const entity = await this.repository.findOne({ where: { id } });
+    if (!entity) throw new NotFoundException('指定された商品カテゴリが見つかりません');
+    entity.imageData = file.buffer;
+    entity.imageMimeType = file.mimetype;
     await this.repository.save(entity);
     return this.toRecord(entity);
   }
@@ -59,6 +98,12 @@ export class ProductCategoriesService {
   }
 
   private toRecord(entity: ProductCategoryEntity): ProductCategoryRecord {
-    return { id: entity.id, name: entity.name };
+    return {
+      id: entity.id,
+      name: entity.name,
+      imageUrl: entity.imageMimeType
+        ? `/product-categories/${entity.id}/image?v=${entity.updatedAt.getTime()}`
+        : undefined,
+    };
   }
 }

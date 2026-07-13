@@ -31,7 +31,7 @@ export default function OrderSearchFilter({
         <Input
           id="filterKeyword"
           type="text"
-          placeholder="顧客名・メール・商品名・注文ID"
+          placeholder="顧客名・メール・電話番号・商品名・注文ID"
           value={filter.keyword}
           onChange={(e) => onFilterChange({ ...filter, keyword: e.target.value })}
         />
@@ -40,9 +40,14 @@ export default function OrderSearchFilter({
         <Label htmlFor="filterStatus">ステータス</Label>
         <Select
           value={filter.status || 'all'}
-          onValueChange={(value) =>
-            onFilterChange({ ...filter, status: value === 'all' ? '' : (value as OrderStatus) })
-          }
+          onValueChange={(value) => {
+            const status = value === 'all' ? '' : (value as OrderStatus);
+            onFilterChange({
+              ...filter,
+              status,
+              includeCompleted: status === 'completed' ? true : filter.includeCompleted,
+            });
+          }}
         >
           <SelectTrigger id="filterStatus" className="w-full">
             <SelectValue />
@@ -75,6 +80,21 @@ export default function OrderSearchFilter({
           onChange={(e) => onFilterChange({ ...filter, dateTo: e.target.value })}
         />
       </div>
+      <label className="completed-filter-checkbox">
+        <input
+          type="checkbox"
+          checked={filter.includeCompleted || false}
+          onChange={(e) =>
+            onFilterChange({
+              ...filter,
+              includeCompleted: e.target.checked,
+              status:
+                !e.target.checked && filter.status === 'completed' ? '' : filter.status,
+            })
+          }
+        />
+        <span>完了分も表示</span>
+      </label>
       <div className="filter-actions">
         <Button type="submit" disabled={loading}>
           {loading ? '検索中...' : '検索'}

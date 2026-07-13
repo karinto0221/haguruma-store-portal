@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { OrdersRepository, OrderRecord } from '../data/orders.repository';
 import { StorageService } from '../storage/storage.service';
@@ -39,6 +40,7 @@ export class OrdersService {
       productName: product.name,
       customerName: dto.customerName,
       customerEmail: dto.customerEmail,
+      customerPhone: dto.customerPhone,
       quantity: dto.quantity,
       notes: dto.notes,
       fileNames,
@@ -55,6 +57,7 @@ export class OrdersService {
       productName: order.productName,
       customerName: order.customerName,
       customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
       quantity: order.quantity,
       notes: order.notes,
       fileNames: order.fileNames,
@@ -66,11 +69,35 @@ export class OrdersService {
   async findAll(query: QueryOrdersDto = {}) {
     return this.ordersRepository.findAll({
       status: query.status,
+      includeCompleted: query.includeCompleted,
       keyword: query.keyword,
       // 日付入力(YYYY-MM-DD)を、その日の始まり/終わりのISO日時に変換してから絞り込む
       dateFrom: query.dateFrom ? `${query.dateFrom}T00:00:00.000Z` : undefined,
       dateTo: query.dateTo ? `${query.dateTo}T23:59:59.999Z` : undefined,
     });
+  }
+
+  async findById(orderId: string) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) {
+      throw new NotFoundException('注文が見つかりません');
+    }
+    return order;
+  }
+
+  async findFile(orderId: string, fileIndex: number) {
+    const order = await this.findById(orderId);
+    if (!Number.isInteger(fileIndex) || fileIndex < 0 || fileIndex >= order.filePaths.length) {
+      throw new NotFoundException('添付ファイルが見つかりません');
+    }
+
+    try {
+      const buffer = await this.storageService.read(order.filePaths[fileIndex]);
+      const fileName = order.fileNames[fileIndex] || `attachment-${fileIndex + 1}`;
+      return { buffer, fileName, mimeType: this.getMimeType(fileName) };
+    } catch {
+      throw new NotFoundException('添付ファイルが見つかりません');
+    }
   }
 
   async updateStatus(orderId: string, status: OrderStatus) {
@@ -98,5 +125,23 @@ export class OrdersService {
       status: 'payment_link_sent',
       paymentLink,
     });
+  }
+
+  private getMimeType(fileName: string): string {
+    switch (path.extname(fileName).toLowerCase()) {
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.gif':
+        return 'image/gif';
+      case '.webp':
+        return 'image/webp';
+      case '.pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
   }
 }
