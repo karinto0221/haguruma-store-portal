@@ -2,9 +2,12 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ProductCategoryEntity } from './product-category.entity';
 
 @Entity('products')
 export class ProductEntity {
@@ -21,6 +24,13 @@ export class ProductEntity {
   // 目安価格。実際は数量・仕様によって変動するため「参考価格」として表示
   @Column({ name: 'price_from', type: 'integer' })
   priceFrom: number;
+
+  @Column({ name: 'product_category_id', type: 'integer' })
+  productCategoryId: number;
+
+  @ManyToOne(() => ProductCategoryEntity, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'product_category_id' })
+  productCategory: ProductCategoryEntity;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

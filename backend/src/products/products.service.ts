@@ -1,8 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductEntity } from './product.entity';
-import { Product } from './product.data';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+
+export interface ProductRecord {
+  id: string;
+  name: string;
+  description: string;
+  priceFrom: number;
+  productCategoryId: number;
+  productCategoryName: string;
+}
+
+// Postgresの一意制約違反(id重複) / 外部キー制約違反(参照している注文が残っている状態で削除しようとした)
+const UNIQUE_VIOLATION = '23505';
+const FOREIGN_KEY_VIOLATION = '23503';
 
 @Injectable()
 export class ProductsService {
@@ -11,22 +25,105 @@ export class ProductsService {
     private readonly productsRepository: Repository<ProductEntity>,
   ) {}
 
-  async findAll(): Promise<Product[]> {
-    const entities = await this.productsRepository.find({ order: { createdAt: 'ASC' } });
-    return entities.map((e) => this.toProduct(e));
+  async findAll(): Promise<ProductRecord[]> {
+    const entities = await this.productsRepository.find({
+      relations: ['productCategory'],
+      order: { createdAt: 'ASC' },
+    });
+    return entities.map((e) => this.toRecord(e));
   }
 
-  async findById(id: string): Promise<Product | undefined> {
+  async findById(id: string): Promise<ProductRecord | undefined> {
+    const entity = await this.productsRepository.findOne({
+      where: { id },
+      relations: ['productCategory'],
+    });
+    return entity ? this.toRecord(entity) : undefined;
+  }
+
+  async create(dto: CreateProductDto): Promise<ProductRecord> {
+    // repository.save()は主キーが既存の場合UPDATEになってしまう(id重複を弾けない)ため、
+    // 新規作成では常にINSERTのみ行うinsert()を使う
+    try {
+      await this.productsRepository.insert({
+        id: dto.id,
+        name: dto.name,
+        description: dto.description,
+        priceFrom: dto.priceFrom,
+        productCategoryId: dto.productCategoryId,
+      });
+    } catch (e: any) {
+      throw this.translateWriteError(e, dto.productCategoryId);
+    }
+
+    const saved = await this.productsRepository.findOne({
+      where: { id: dto.id },
+      relations: ['productCategory'],
+    });
+    return this.toRecord(saved!);
+  }
+
+  async update(id: string, dto: UpdateProductDto): Promise<ProductRecord> {
     const entity = await this.productsRepository.findOne({ where: { id } });
-    return entity ? this.toProduct(entity) : undefined;
+    if (!entity) {
+      throw new NotFoundException('指定された商品が見つかりません');
+    }
+
+    entity.name = dto.name;
+    entity.description = dto.description;
+    entity.priceFrom = dto.priceFrom;
+    entity.productCategoryId = dto.productCategoryId;
+
+    try {
+      await this.productsRepository.save(entity);
+    } catch (e: any) {
+      throw this.translateWriteError(e, dto.productCategoryId);
+    }
+
+    const saved = await this.productsRepository.findOne({
+      where: { id },
+      relations: ['productCategory'],
+    });
+    return this.toRecord(saved!);
   }
 
-  private toProduct(entity: ProductEntity): Product {
+  async remove(id: string): Promise<void> {
+    const entity = await this.productsRepository.findOne({ where: { id } });
+    if (!entity) {
+      throw new NotFoundException('指定された商品が見つかりません');
+    }
+    try {
+      await this.productsRepository.remove(entity);
+    } catch (e: any) {
+      if (e?.code === FOREIGN_KEY_VIOLATION) {
+        throw new ConflictException(
+          'この商品を参照している注文が存在するため削除できません',
+        );
+      }
+      throw e;
+    }
+  }
+
+  private translateWriteError(e: any, productCategoryId: number) {
+    if (e?.code === UNIQUE_VIOLATION) {
+      return new ConflictException('このIDは既に使用されています');
+    }
+    if (e?.code === FOREIGN_KEY_VIOLATION) {
+      return new NotFoundException(
+        `指定されたカテゴリ(id: ${productCategoryId})が見つかりません`,
+      );
+    }
+    return e;
+  }
+
+  private toRecord(entity: ProductEntity): ProductRecord {
     return {
       id: entity.id,
       name: entity.name,
       description: entity.description,
       priceFrom: entity.priceFrom,
+      productCategoryId: entity.productCategoryId,
+      productCategoryName: entity.productCategory?.name ?? '',
     };
   }
 }

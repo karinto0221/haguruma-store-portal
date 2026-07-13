@@ -5,6 +5,8 @@ export interface Product {
   name: string;
   description: string;
   priceFrom: number;
+  productCategoryId: number;
+  productCategoryName: string;
 }
 
 export async function fetchProducts(): Promise<Product[]> {
@@ -44,6 +46,34 @@ export async function createOrder(input: CreateOrderInput): Promise<{ orderId: s
 
 // --- 管理者向け ---
 
+export interface AdminCredentials {
+  id: string;
+  password: string;
+}
+
+function adminHeaders(credentials: AdminCredentials): Record<string, string> {
+  return {
+    'x-admin-id': credentials.id,
+    'x-admin-password': credentials.password,
+  };
+}
+
+async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => ({}));
+  if (Array.isArray(body.message)) return body.message.join(' / ');
+  return body.message || fallback;
+}
+
+export async function loginAdmin(credentials: AdminCredentials): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/admin/login`, {
+    method: 'POST',
+    headers: adminHeaders(credentials),
+  });
+  if (!res.ok) {
+    throw new Error('ユーザーIDまたはパスワードが正しくありません');
+  }
+}
+
 export type OrderStatus = 'new' | 'reviewing' | 'payment_link_sent' | 'cancelled';
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -73,23 +103,11 @@ export interface OrderRecord {
   createdAt: string;
 }
 
-export interface AdminCredentials {
-  id: string;
-  password: string;
-}
-
 export interface OrdersSearchFilter {
   status?: OrderStatus | '';
   keyword?: string;
   dateFrom?: string;
   dateTo?: string;
-}
-
-function adminHeaders(credentials: AdminCredentials): Record<string, string> {
-  return {
-    'x-admin-id': credentials.id,
-    'x-admin-password': credentials.password,
-  };
 }
 
 export async function fetchOrdersAdmin(
@@ -121,8 +139,7 @@ export async function updateOrderStatusAdmin(
     body: JSON.stringify({ status }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || 'ステータスの更新に失敗しました');
+    throw new Error(await parseErrorMessage(res, 'ステータスの更新に失敗しました'));
   }
   return res.json();
 }
@@ -138,8 +155,127 @@ export async function sendPaymentLinkAdmin(
     body: JSON.stringify({ paymentLink }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || '送信に失敗しました');
+    throw new Error(await parseErrorMessage(res, '送信に失敗しました'));
   }
   return res.json();
+}
+
+// --- マスタ管理: 商品カテゴリ ---
+
+export interface ProductCategory {
+  id: number;
+  name: string;
+}
+
+export interface ProductCategoryInput {
+  name: string;
+}
+
+export async function fetchProductCategoriesAdmin(
+  credentials: AdminCredentials,
+): Promise<ProductCategory[]> {
+  const res = await fetch(`${API_BASE_URL}/product-categories`, {
+    headers: adminHeaders(credentials),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品カテゴリ一覧の取得に失敗しました'));
+  return res.json();
+}
+
+export async function createProductCategoryAdmin(
+  credentials: AdminCredentials,
+  input: ProductCategoryInput,
+): Promise<ProductCategory> {
+  const res = await fetch(`${API_BASE_URL}/product-categories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品カテゴリの作成に失敗しました'));
+  return res.json();
+}
+
+export async function updateProductCategoryAdmin(
+  credentials: AdminCredentials,
+  id: number,
+  input: ProductCategoryInput,
+): Promise<ProductCategory> {
+  const res = await fetch(`${API_BASE_URL}/product-categories/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品カテゴリの更新に失敗しました'));
+  return res.json();
+}
+
+export async function deleteProductCategoryAdmin(
+  credentials: AdminCredentials,
+  id: number,
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/product-categories/${id}`, {
+    method: 'DELETE',
+    headers: adminHeaders(credentials),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品カテゴリの削除に失敗しました'));
+}
+
+// --- マスタ管理: 商品 ---
+
+export interface CreateProductInput {
+  id: string;
+  name: string;
+  description: string;
+  priceFrom: number;
+  productCategoryId: number;
+}
+
+export interface UpdateProductInput {
+  name: string;
+  description: string;
+  priceFrom: number;
+  productCategoryId: number;
+}
+
+export async function fetchProductsAdmin(credentials: AdminCredentials): Promise<Product[]> {
+  // 商品一覧は公開APIと共通(カテゴリ名は非公開情報ではないため)。認証ヘッダーは無視される
+  const res = await fetch(`${API_BASE_URL}/products`, {
+    headers: adminHeaders(credentials),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品一覧の取得に失敗しました'));
+  return res.json();
+}
+
+export async function createProductAdmin(
+  credentials: AdminCredentials,
+  input: CreateProductInput,
+): Promise<Product> {
+  const res = await fetch(`${API_BASE_URL}/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品の作成に失敗しました'));
+  return res.json();
+}
+
+export async function updateProductAdmin(
+  credentials: AdminCredentials,
+  id: string,
+  input: UpdateProductInput,
+): Promise<Product> {
+  const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders(credentials) },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品の更新に失敗しました'));
+  return res.json();
+}
+
+export async function deleteProductAdmin(credentials: AdminCredentials, id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/products/${id}`, {
+    method: 'DELETE',
+    headers: adminHeaders(credentials),
+  });
+  if (!res.ok) throw new Error(await parseErrorMessage(res, '商品の削除に失敗しました'));
 }
