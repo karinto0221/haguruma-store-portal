@@ -1,6 +1,6 @@
 import { MouseEvent, ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronRight, ClipboardList, Layers, LogOut } from 'lucide-react';
+import { ChevronRight, ClipboardList, History, Layers, LogOut } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Sidebar,
@@ -45,6 +45,7 @@ function AdminSidebar({ onLogout, children }: AdminLayoutProps) {
   const isOrdersActive =
     location.pathname === '/admin' || location.pathname.startsWith('/admin/orders/');
   const isMasterActive = MASTER_NAV.some((item) => location.pathname === item.to);
+  const isUpdatesActive = location.pathname === '/admin/updates';
   const [masterOpen, setMasterOpen] = useState(isMasterActive);
 
   // サイドバーが折りたたまれている状態で「マスタ管理」(分類アイコン)をクリックしたら、
@@ -109,11 +110,24 @@ function AdminSidebar({ onLogout, children }: AdminLayoutProps) {
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
+
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isUpdatesActive}
+                tooltip="更新情報"
+              >
+                <Link to="/admin/updates">
+                  <History />
+                  <span>更新情報</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton onClick={onLogout} tooltip="ログアウト">
                 <LogOut />

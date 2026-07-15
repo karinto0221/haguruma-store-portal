@@ -16,8 +16,9 @@
 | 8 | 注文詳細画面 | `/admin/orders/:orderId` | `features/order-detail` | ユーザーID・パスワード |
 | 9 | 商品カテゴリ管理画面 | `/admin/master/product-categories` | `features/product-categories` | ユーザーID・パスワード |
 | 10 | 商品マスタ管理画面 | `/admin/master/products` | `features/product-master` | ユーザーID・パスワード |
+| 11 | 更新情報画面 | `/admin/updates` | `features/update-history` | ユーザーID・パスワード |
 
-ルーティング定義: `frontend/src/route/index.tsx`。`/admin`配下の4画面はReact Routerのネストルートで`components/layout/AdminGate.tsx`配下に置かれ、ログイン状態を`AdminAuthProvider`で共有する。
+ルーティング定義: `frontend/src/route/index.tsx`。`/admin`配下の5画面はReact Routerのネストルートで`components/layout/AdminGate.tsx`配下に置かれ、ログイン状態を`AdminAuthProvider`で共有する。
 
 ## 2. 画面遷移図
 
@@ -31,7 +32,7 @@
 [6. 管理者ログイン画面] --ログイン成功--> [7. 管理者注文一覧画面](既定の遷移先)
 [7. 管理者注文一覧画面] --注文カードを選択--> [8. 注文詳細画面]
 [8. 注文詳細画面] --「注文一覧へ戻る」--> [7. 管理者注文一覧画面]
-[7〜10 いずれかの管理画面] --サイドバー下部「ログアウト」--> [6. 管理者ログイン画面]
+[7〜11 いずれかの管理画面] --サイドバー下部「ログアウト」--> [6. 管理者ログイン画面]
 ```
 
 - 画面4→5の遷移では、`react-router`の`navigate('/confirm', { state: { orderId } })`でorderIdを渡している。`/confirm`に直接アクセスした場合(リロード等)は`orderId`が失われ、注文番号非表示のまま完了メッセージのみ表示される。
@@ -44,7 +45,7 @@
 - ヘッダー部は `kicker`(小さいラベル文言)+`h1` の組み合わせで統一。
 - フォント: 見出し `Shippori Mincho`、本文 `Zen Kaku Gothic New`。
 - エラーメッセージは共通で `.error-box` に赤系背景で表示。
-- 管理画面(7〜10)は共通で `components/layout/AdminLayout.tsx` による開閉可能なサイドバー付きレイアウトを持つ(詳細は9.1)。shadcn/uiの`Sidebar`コンポーネントを使用し、テーマはブランドカラー(テラコッタ系)にカスタマイズ済み。
+- 管理画面(7〜11)は共通で `components/layout/AdminLayout.tsx` による開閉可能なサイドバー付きレイアウトを持つ(詳細は9.1)。shadcn/uiの`Sidebar`コンポーネントを使用し、テーマはブランドカラー(テラコッタ系)にカスタマイズ済み。
 
 ---
 
@@ -144,7 +145,7 @@
 
 ## 9. 管理者ログイン画面(features/admin-auth の LoginForm)
 
-- URL: `/admin`・`/admin/master/product-categories`・`/admin/master/products` のいずれかに未ログインでアクセスした場合共通(`components/layout/AdminGate.tsx`が判定して表示)
+- URL: `/admin/*`配下のいずれかに未ログインでアクセスした場合共通(`components/layout/AdminGate.tsx`が判定して表示)
 - 目的: 管理者がユーザーID・パスワードを入力し、管理画面(注文管理・マスタ管理)にアクセスする。
 
 ### 入力項目
@@ -164,14 +165,14 @@
 
 ### 9.1 サイドバー(AdminLayout)
 
-ログイン後の管理画面(8〜10)は共通で`components/layout/AdminLayout.tsx`によるサイドバー付きレイアウトを持つ。shadcn/uiの`Sidebar`コンポーネント(`collapsible="icon"`)を使用。
+ログイン後の管理画面(7〜11)は共通で`components/layout/AdminLayout.tsx`によるサイドバー付きレイアウトを持つ。shadcn/uiの`Sidebar`コンポーネント(`collapsible="icon"`)を使用。
 
 | 要素 | 内容 |
 |---|---|
 | サイドバーヘッダー | 開閉トリガーボタン(`SidebarTrigger`) |
 | メニューグループ「メニュー」 | 注文管理(`/admin`) |
 | メニューグループ「マスタ管理」 | 商品カテゴリ(`/admin/master/product-categories`)・商品マスタ(`/admin/master/products`) |
-| サイドバーフッター | ログアウトボタン(クリックで`AdminAuthProvider`の認証情報をクリアし、ログイン画面に戻す) |
+| サイドバーフッター | 更新情報(`/admin/updates`)とログアウトボタン。更新情報は業務メニューではなく補助情報としてログアウト直上に配置 |
 
 - サイドバーは開閉可能(`collapsible="icon"`): トリガーボタンでアイコンのみの折りたたみ表示と、ラベル付きの通常表示を切り替えられる。折りたたみ時は各メニュー項目にツールチップでラベルを表示。
 - 現在のURLに応じて、該当するメニュー項目がハイライト(`isActive`)される。
@@ -362,7 +363,19 @@
 
 ---
 
-## 14. 未実装・既知の制約(画面まわり)
+## 14. 更新情報画面(features/update-history)
+
+- URL: `/admin/updates`
+- 目的: 管理者が現在デプロイされているアプリのバージョンと、これまでに追加・改善された機能を確認する。
+- サイドバーでは業務メニューと分け、フッターのログアウトボタン直上に「更新情報」として配置する。
+- 現在のバージョンは`frontend/package.json`の`version`をビルド時に読み込んで表示する。
+- 更新履歴は`features/update-history/data/updateHistory.ts`の静的配列を新しい順で表示する。日付・バージョン・変更概要を共通の1行形式で表示し、行を選択するとダイアログで詳しい変更内容を確認できる。APIやDBは使用しない。
+- ユーザーに見える機能追加・修正時は、コード変更と同時に該当バージョンの`changes`へ1項目追加する。
+- `.page-wide`を使用して他の管理画面と横幅を揃える。現在のバージョンは見出し横のバッジで表示し、スマホ幅でも各履歴は省略表示を使って1行を維持する。
+
+---
+
+## 15. 未実装・既知の制約(画面まわり)
 
 - 管理者ログイン状態は同一タブの`sessionStorage`に保持されるためリロードでは維持されるが、タブを閉じると破棄される。JWTやサーバーセッションによる認証ではない。
 - 注文の削除・キャンセル理由入力などの機能は無い(ステータスを`cancelled`にするだけ)。
