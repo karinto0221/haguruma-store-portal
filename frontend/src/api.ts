@@ -37,6 +37,7 @@ export interface CreateOrderInput {
   customerEmail: string;
   customerPhone?: string;
   quantity: number;
+  totalPrice: number;
   notes?: string;
   files: File[];
 }

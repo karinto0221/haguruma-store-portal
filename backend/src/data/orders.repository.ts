@@ -14,6 +14,7 @@ export interface OrderRecord {
   customerEmail: string;
   customerPhone?: string;
   quantity: number;
+  totalPrice: number;
   notes?: string;
   fileNames: string[];
   filePaths: string[];
@@ -52,6 +53,7 @@ export class OrdersRepository {
       customerEmail: order.customerEmail,
       customerPhone: order.customerPhone ?? null,
       quantity: order.quantity,
+      totalPrice: order.totalPrice,
       notes: order.notes ?? null,
       fileNames: order.fileNames,
       filePaths: order.filePaths,
@@ -126,6 +128,7 @@ export class OrdersRepository {
       customerEmail: entity.customerEmail,
       customerPhone: entity.customerPhone ?? undefined,
       quantity: entity.quantity,
+      totalPrice: entity.totalPrice,
       notes: entity.notes ?? undefined,
       fileNames: entity.fileNames,
       filePaths: entity.filePaths,

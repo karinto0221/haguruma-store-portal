@@ -15,9 +15,10 @@
 │    created_at             │         │    name               │         │    customer_name              │
 │    updated_at             │         │    description        │         │    customer_email             │
 └───────────────────────┘         │    price_from         │         │    quantity                   │
-                                     │    created_at         │         │    notes                      │
-                                     │    updated_at         │         │    file_names (text[])        │
-                                     └────────────────────┘         │    file_paths (text[])        │
+                                     │    created_at         │         │    total_price                │
+                                     │    updated_at         │         │    notes                      │
+                                     └────────────────────┘         │    file_names (text[])        │
+                                                                       │    file_paths (text[])        │
                                                                        │    status (enum)              │
                                                                        │    payment_link               │
                                                                        │    created_at                 │
@@ -75,6 +76,7 @@
 | customer_email | varchar(255)       | NOT NULL | -          | 注文者メールアドレス                                                                       |
 | customer_phone | varchar(50)        | NULL可   | -          | 注文者電話番号(任意入力)                                                                   |
 | quantity       | integer            | NOT NULL | -          | 数量(1以上、DTOバリデーションのみでDB制約は無し)                                           |
+| total_price    | integer            | NOT NULL | -          | 注文時点の総額。注文受付時の`products.price_from × quantity`を保存                         |
 | notes          | text               | NULL可   | -          | 備考・要望                                                                                 |
 | file_names     | text[]             | NOT NULL | `{}`       | アップロードされたファイルの元ファイル名一覧                                               |
 | file_paths     | text[]             | NOT NULL | `{}`       | 保存先の相対パス一覧(`UPLOAD_DIR`からの相対パス、`{orderId}/{timestamp}-{sanitized name}`) |
@@ -86,6 +88,7 @@
 - 主キー制約: `PK_710e2d4957aa5878dfe94e4ac2f` (id)
 - 外部キー制約: `FK_ac832121b6c331b084ecc4121fd` (product_id → products.id, ON DELETE RESTRICT, ON UPDATE NO ACTION)
 - `file_names`と`file_paths`は同じ並び順・同じ要素数で対応している(配列インデックスで対応関係を取る設計。DB制約による整合性保証はしておらず、アプリ側のロジックでのみ保たれている)。
+- `total_price`は注文受付時に計算して保存するスナップショットであり、その後`products.price_from`を変更しても既存注文の総額は変わらない。0以上のCHECK制約`CHK_orders_total_price_non_negative`を持つ。
 
 ### 2.4 order_status(列挙型)
 
@@ -124,6 +127,7 @@
 | `1783908720243-AddProductCategories.ts`             | `product_categories`テーブルを新設し初期カテゴリ9件をINSERT。`products`に`product_category_id`列を追加し、既存5商品にカテゴリを割り当てた上でNOT NULL制約・外部キーを付与 |
 | `1783910000000-AddCatalogImagesAndCustomerPhone.ts` | `product_categories`・`products`に画像バイナリ/MIME列を追加し、`orders`に任意の電話番号列を追加                                                                           |
 | `1783911000000-AddCompletedOrderStatus.ts`          | PostgreSQL ENUM `order_status`へ`completed`を追加。ロールバック時は`completed`の注文を`reviewing`へ戻してENUMを再作成                                                     |
+| `1784080000000-AddOrderTotalPrice.ts`               | `orders.total_price`を追加。既存注文はマイグレーション実行時点の`products.price_from × quantity`で補完し、NOT NULL・0以上のCHECK制約を設定                                 |
 
 運用コマンド(`backend/package.json`):
 

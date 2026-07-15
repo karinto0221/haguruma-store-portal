@@ -53,6 +53,7 @@ export class OrdersService {
       customerEmail: dto.customerEmail,
       customerPhone: dto.customerPhone,
       quantity: dto.quantity,
+      totalPrice: product.priceFrom * dto.quantity,
       notes: dto.notes,
       fileNames,
       filePaths,

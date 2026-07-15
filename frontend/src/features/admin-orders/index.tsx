@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom';
 import { useAdminOrders } from "./hook/useAdminOrders";
 import OrderSearchFilter from "./component/OrderSearchFilter";
 import OrderList from "./component/OrderList";
+import OrderCsvExportButton from './component/OrderCsvExportButton';
 
 export default function AdminOrders() {
   const navigate = useNavigate();
@@ -32,6 +34,10 @@ export default function AdminOrders() {
         onReset={handleResetFilter}
       />
 
+      <div className="order-export-actions">
+        <OrderCsvExportButton orders={orders} loading={loading} />
+      </div>
+
       {error && (
         <div className="error-box" style={{ marginTop: 20 }}>
           {error}
@@ -46,4 +52,3 @@ export default function AdminOrders() {
     </div>
   );
 }
-import { useNavigate } from "react-router-dom";

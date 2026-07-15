@@ -853,6 +853,12 @@ body {
   margin-bottom: 12px;
 }
 
+.order-export-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 .filter-field {
   display: flex;
   flex-direction: column;
@@ -1140,6 +1146,10 @@ body {
 }
 
 @media (max-width: 560px) {
+  .order-export-actions button {
+    width: 100%;
+  }
+
   .filter-bar {
     align-items: stretch;
     flex-direction: column;

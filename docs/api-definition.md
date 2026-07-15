@@ -149,10 +149,11 @@
 **処理内容(参考)**
 
 1. `productId`が実在するか確認
-2. HEIC/HEIF画像は表示互換性のためJPEGへ変換し、それ以外の添付ファイルとともにディスク(`UPLOAD_DIR/{orderId}/`)へ保存
-3. 注文をDB(`orders`テーブル)に`status: 'new'`で保存
-4. `ADMIN_NOTIFY_EMAIL`宛に、注文ID・商品・注文者・数量・備考・添付ファイル名を含む新規注文通知メールを送信
-5. `customerEmail`宛に、注文を受け付けたこと、注文ID、商品、数量、後ほど支払い用URLを送ることを記載した注文受付メールを送信
+2. 商品の`priceFrom × quantity`で注文総額`totalPrice`を計算
+3. HEIC/HEIF画像は表示互換性のためJPEGへ変換し、それ以外の添付ファイルとともにディスク(`UPLOAD_DIR/{orderId}/`)へ保存
+4. 注文総額を含む注文をDB(`orders`テーブル)に`status: 'new'`で保存
+5. `ADMIN_NOTIFY_EMAIL`宛に、注文ID・商品・注文者・数量・備考・添付ファイル名を含む新規注文通知メールを送信
+6. `customerEmail`宛に、注文を受け付けたこと、注文ID、商品、数量、後ほど支払い用URLを送ることを記載した注文受付メールを送信
 
 2通のメールは独立して送信する。片方が失敗してももう片方の送信は実行し、失敗は注文IDとともにサーバーログへ記録する。SMTP未設定時は両方ともログ出力のみでスキップする。
 
@@ -186,6 +187,7 @@
     "customerEmail": "test@example.com",
     "customerPhone": "090-1234-5678",
     "quantity": 2,
+    "totalPrice": 6000,
     "notes": "DB移行確認用の注文",
     "fileNames": [],
     "filePaths": [],
@@ -204,6 +206,7 @@
 | customerEmail | string | 注文者メールアドレス |
 | customerPhone | string \| undefined | 注文者電話番号。未入力時はキー自体が存在しない |
 | quantity | number | 数量 |
+| totalPrice | number | 注文時点の総額。注文受付時の`products.price_from × quantity`を保存するため、後の商品価格変更の影響を受けない |
 | notes | string \| undefined | 備考。未入力時はキー自体が存在しない |
 | fileNames | string[] | 添付ファイルの元ファイル名一覧 |
 | filePaths | string[] | サーバー内保存パス一覧(公開URLではない。画面からの取得には認証付き3.20を使用する) |

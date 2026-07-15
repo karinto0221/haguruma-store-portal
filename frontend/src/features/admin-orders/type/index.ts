@@ -18,3 +18,8 @@ export interface OrderListProps {
   loading: boolean;
   onSelect: (orderId: string) => void;
 }
+
+export interface OrderCsvExportButtonProps {
+  orders: OrderRecord[];
+  loading: boolean;
+}

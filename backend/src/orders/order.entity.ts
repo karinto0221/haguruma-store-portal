@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -12,6 +13,7 @@ import { ProductEntity } from '../products/product.entity';
 import { ORDER_STATUSES, OrderStatus } from './order-status';
 
 @Entity('orders')
+@Check('CHK_orders_total_price_non_negative', '"total_price" >= 0')
 export class OrderEntity {
   // アプリ側でuuidv4()を発行してから採番するため、DB側では生成しない
   @PrimaryColumn({ type: 'uuid' })
@@ -36,6 +38,10 @@ export class OrderEntity {
 
   @Column({ type: 'integer' })
   quantity: number;
+
+  // 注文受付時の商品参考価格 × 数量。商品マスタ変更後も注文時点の総額を保持する。
+  @Column({ name: 'total_price', type: 'integer' })
+  totalPrice: number;
 
   @Column({ type: 'text', nullable: true })
   notes: string | null;
