@@ -121,6 +121,7 @@ export interface OrderRecord {
   customerEmail: string;
   customerPhone?: string;
   quantity: number;
+  totalPrice: number;
   notes?: string;
   fileNames: string[];
   status: OrderStatus;
