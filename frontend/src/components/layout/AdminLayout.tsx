@@ -8,7 +8,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarHeader,
   SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
@@ -67,15 +66,6 @@ function AdminSidebar({ account, onLogout, children }: AdminLayoutProps) {
   return (
     <>
       <Sidebar collapsible="icon">
-        {(isMobile || state === 'expanded') && (
-          <SidebarHeader className="admin-sidebar-account">
-            <CircleUserRound aria-hidden="true" />
-            <div className="admin-sidebar-account-text">
-              <strong>{account.name}</strong>
-              <span>{account.loginId}</span>
-            </div>
-          </SidebarHeader>
-        )}
         <SidebarContent>
           <SidebarGroup>
             <SidebarMenu>
@@ -154,13 +144,34 @@ function AdminSidebar({ account, onLogout, children }: AdminLayoutProps) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={onLogout} tooltip="ログアウト">
-                <LogOut />
-                <span>ログアウト</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
           </SidebarMenu>
+          {(isMobile || state === 'expanded') ? (
+            <div className="admin-sidebar-account">
+              <CircleUserRound aria-hidden="true" />
+              <div className="admin-sidebar-account-text">
+                <strong>{account.name}</strong>
+                <span>{account.loginId}</span>
+              </div>
+              <button
+                type="button"
+                className="admin-sidebar-logout"
+                onClick={onLogout}
+                aria-label="ログアウト"
+                title="ログアウト"
+              >
+                <LogOut aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={onLogout} tooltip="ログアウト">
+                  <LogOut />
+                  <span>ログアウト</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          )}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
