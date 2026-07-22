@@ -14,6 +14,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ap-northeast-3
+        awslogs-group: /haguruma-store/db
+        awslogs-stream: db
   backend:
     build: ./backend
     ports:
@@ -28,12 +34,25 @@ services:
         condition: service_healthy
     volumes:
       - uploads:/app/uploads
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ap-northeast-3
+        awslogs-group: /haguruma-store/backend
+        awslogs-stream: backend
+
   frontend:
     build: ./frontend
     ports:
       - "8080:80"
     depends_on:
       - backend
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ap-northeast-3
+        awslogs-group: /haguruma-store/frontend
+        awslogs-stream: frontend
   mailpit:
     image: axllent/mailpit:v1.27
     profiles:
